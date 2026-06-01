@@ -22,6 +22,8 @@ Funcionamiento de la UI:
        estado y borra los lazos dibujados.
 """
 
+import re
+
 import numpy as np
 import plotly.graph_objects as go
 import sympy.combinatorics as comb
@@ -83,7 +85,7 @@ def formato_lista_permutaciones(perms) -> str:
 # ---------------------------------------------------------------------
 # Construccion de la figura
 # ---------------------------------------------------------------------
-def construir_figura_alpha() -> dict:
+def construir_figura_alpha() -> go.Figure:
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
@@ -137,7 +139,13 @@ def construir_figura_alpha() -> dict:
         showlegend=True,
         legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.8)"),
     )
-    return fig.to_plotly_json()
+    return fig
+
+
+# Plotly entrega el path como 'M-0.12,0.45L-0.11,0.47L...', sin
+# espacios entre los comandos SVG y las coordenadas. Reemplazamos las
+# letras de comando y las comas por espacios y leemos pares de floats.
+_RE_COMANDOS_SVG = re.compile(r"[MLHVCSQTAZmlhvcsqtaz]")
 
 
 def lazo_desde_path(path_str: str) -> np.ndarray | None:
@@ -146,20 +154,16 @@ def lazo_desde_path(path_str: str) -> np.ndarray | None:
     coordenadas."""
     if not path_str:
         return None
-    tokens = path_str.replace(",", " ").split()
+    limpio = _RE_COMANDOS_SVG.sub(" ", path_str).replace(",", " ")
+    tokens = limpio.split()
     coords: list[complex] = []
-    i = 0
-    while i < len(tokens):
-        if tokens[i].upper() in {"M", "L", "Z"}:
-            i += 1
-            continue
+    for i in range(0, len(tokens) - 1, 2):
         try:
             x = float(tokens[i])
             y = float(tokens[i + 1])
             coords.append(x + 1j * y)
-            i += 2
-        except (ValueError, IndexError):
-            i += 1
+        except ValueError:
+            continue
     if len(coords) < 2:
         return None
     return np.asarray(coords, dtype=complex)
@@ -173,7 +177,12 @@ state, ctrl = server.state, server.controller
 
 generadores: list[comb.Permutation] = []
 
-state.figura_alpha = construir_figura_alpha()
+# Referencia al widget Plotly. Se asigna al construir el layout y se
+# utiliza desde reset() para inyectar una figura nueva (los lazos
+# dibujados por el usuario forman parte de la layout de Plotly, asi
+# que para borrarlos basta con sustituir la figura entera).
+fig_widget: plotly.Figure | None = None
+
 state.shapes_dibujadas = []
 state.estructura_grupo = "trivial"
 state.orden_grupo = 1
@@ -228,7 +237,8 @@ def calcular_permutacion():
 
 def reset():
     generadores.clear()
-    state.figura_alpha = construir_figura_alpha()
+    if fig_widget is not None:
+        fig_widget.update(construir_figura_alpha())
     state.shapes_dibujadas = []
     state.mensaje_status = "Reset."
     actualizar_panel()
@@ -259,8 +269,8 @@ with SinglePageLayout(server) as layout:
             with vuetify3.VRow(no_gutters=True):
                 # --- Columna del gráfico (plano alpha) ---
                 with vuetify3.VCol(cols=8, classes="pa-2"):
-                    plotly.Figure(
-                        figure=("figura_alpha",),
+                    fig_widget = plotly.Figure(
+                        figure=construir_figura_alpha(),
                         relayout=(ctrl.on_relayout, "[$event]"),
                         style="width: 100%; height: 78vh;",
                     )
