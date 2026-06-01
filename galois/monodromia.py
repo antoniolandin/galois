@@ -5,6 +5,7 @@ la fibra base a lo largo del lazo: las posiciones finales deben coincidir
 (como conjunto) con las iniciales, y la asignacion concreta
 'raiz i -> raiz sigma(i)' es la permutacion buscada."""
 
+import math
 from typing import Sequence
 
 import numpy as np
@@ -15,20 +16,22 @@ from .polinomio import Polinomio
 from .raices import raices_en
 
 
-def permutacion_de_lazo(
+def permutacion_y_trayectorias_de_lazo(
     polinomio: Polinomio,
     alpha_estrella: complex,
     lazo: np.ndarray,
     raices_base: np.ndarray | None = None,
-) -> comb.Permutation:
-    """Calcula la permutacion inducida por un lazo en la fibra
-    pi^{-1}(alpha_estrella).
+) -> tuple[comb.Permutation, np.ndarray]:
+    """Calcula la permutacion inducida por un lazo y devuelve tambien
+    las trayectorias completas de las n raices.
 
     El lazo debe estar basado en alpha_estrella: lazo[0] == lazo[-1] == alpha_estrella.
 
     Si raices_base se pasa, se reutiliza como fibra inicial (ahorra una
     llamada a numpy.roots y, mas importante, garantiza una ordenacion
-    canonica de las raices entre lazos consecutivos)."""
+    canonica de las raices entre lazos consecutivos).
+
+    Devuelve (sigma, trayectorias) con trayectorias de shape (n, N)."""
     if raices_base is None:
         raices_base = raices_en(polinomio, alpha_estrella)
     n = len(raices_base)
@@ -39,7 +42,21 @@ def permutacion_de_lazo(
 
     raices_finales = trayectorias[:, -1]
     asignacion = _emparejar_por_proximidad(raices_finales, raices_base)
-    return comb.Permutation(asignacion, size=n)
+    return comb.Permutation(asignacion, size=n), trayectorias
+
+
+def permutacion_de_lazo(
+    polinomio: Polinomio,
+    alpha_estrella: complex,
+    lazo: np.ndarray,
+    raices_base: np.ndarray | None = None,
+) -> comb.Permutation:
+    """Calcula la permutacion inducida por un lazo. Si necesitas tambien
+    las trayectorias, utiliza `permutacion_y_trayectorias_de_lazo`."""
+    sigma, _ = permutacion_y_trayectorias_de_lazo(
+        polinomio, alpha_estrella, lazo, raices_base
+    )
+    return sigma
 
 
 def _emparejar_por_proximidad(
@@ -78,20 +95,29 @@ def orbitas(grupo: comb.PermutationGroup) -> list[set[int]]:
 
 
 def describir_grupo(grupo: comb.PermutationGroup, n: int) -> str:
-    """Identificacion abstracta rudimentaria del subgrupo (S_n, A_n,
-    ciclico, diedrico u 'orden N')."""
+    """Identificacion abstracta rudimentaria del subgrupo: S_n, A_n,
+    ciclico, diedrico u 'orden N' como fallback.
+
+    Sympy 1.14 no expone `is_alt` como propiedad publica; se detecta
+    A_n combinando orden = n!/2 con la condicion necesaria y suficiente
+    de que todos los generadores sean permutaciones pares (equivale a
+    G ⊆ A_n)."""
     orden = grupo.order()
+    factorial_n = math.factorial(n)
+
     if orden == 1:
         return "trivial"
-    if grupo.is_symmetric:
+    if orden == factorial_n and grupo.is_symmetric:
         return f"S_{n}"
-    if grupo.is_alt:
+    if orden == factorial_n // 2 and all(g.is_even for g in grupo.generators):
         return f"A_{n}"
-    try:
-        if grupo.is_dihedral:
-            return f"D_{orden // 2}"
-    except AttributeError:
-        pass
     if grupo.is_cyclic:
         return f"C_{orden}"
+    # Diedrico: sympy no expone is_dihedral en todas las versiones.
+    if hasattr(grupo, "is_dihedral"):
+        try:
+            if grupo.is_dihedral:
+                return f"D_{orden // 2}"
+        except (AttributeError, NotImplementedError):
+            pass
     return f"orden {orden}"

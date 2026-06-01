@@ -10,6 +10,15 @@ dependencies = [
     "trame>=3.4",
     "trame-plotly>=3.0",
     "trame-vuetify>=2.4",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
 ]
 
 [tool.uv]
@@ -17,3 +26,7 @@ package = false
 
 [tool.ruff]
 line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
