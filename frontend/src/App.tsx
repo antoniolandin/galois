@@ -161,15 +161,27 @@ export default function App() {
   }, []);
 
   // Borrado de un generador específico vía el botón × del panel.
-  const handleDeleteGenerator = useCallback((idx: number) => {
-    setGeneradores((prev) => prev.filter((_, i) => i !== idx));
-    setSelectedIdx((prev) => {
-      if (prev == null) return null;
-      if (prev === idx) return null;
-      if (prev > idx) return prev - 1;
-      return prev;
-    });
-  }, []);
+  const handleDeleteGenerator = useCallback(
+    (idx: number) => {
+      const eraElSeleccionado = selectedIdx === idx;
+      setGeneradores((prev) => prev.filter((_, i) => i !== idx));
+      setSelectedIdx((prev) => {
+        if (prev == null) return null;
+        if (prev === idx) return null;
+        if (prev > idx) return prev - 1;
+        return prev;
+      });
+      // Si lo que se eliminó era lo que estaba en pantalla, limpiar
+      // también el lazo interno del PlanoAlpha + trayectorias para
+      // que no quede el trazo "huérfano".
+      if (eraElSeleccionado) {
+        setClearLazoSignal((s) => s + 1);
+        resetTrayectorias();
+        setStartRoots([...INITIAL_ROOTS]);
+      }
+    },
+    [selectedIdx, resetTrayectorias],
+  );
 
   // El usuario interactuó con el canvas: deseleccionar el generador
   // mostrado, si lo había, para volver al estado live.
