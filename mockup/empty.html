@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Layout — Visualizador de monodromía (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link
+  href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+  rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --font-ui:   "Manrope", -apple-system, BlinkMacSystemFont,
+                 "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-math: "Fira Code", "Fira Mono", "SF Mono", Consolas,
+                 "Liberation Mono", monospace;
+  }
+
+  body {
+    font-family: var(--font-ui);
+    background: #f3f3f5;
+    color: #2c2c2c;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "ss01", "cv11";  /* glyph alternates de Plex Sans */
+  }
+
+  .app {
+    display: grid;
+    grid-template-rows: 56px 1fr;
+    height: 100vh;
+  }
+
+  /* ============ HEADER ============ */
+  .header {
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    gap: 20px;
+  }
+
+  .header h1 {
+    font-size: 15px;
+    font-weight: 500;
+    color: #1a1a1a;
+  }
+
+  .header .poly {
+    margin-left: auto;
+    font-family: var(--font-math);
+    color: #555;
+    font-size: 13px;
+    background: #f5f5f7;
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+
+  /* ============ MAIN GRID ============ */
+  .main {
+    display: grid;
+    grid-template-columns: 320px 1fr 280px;
+    gap: 1px;
+    background: #e0e0e0;
+    overflow: hidden;
+  }
+
+  .panel {
+    background: #fff;
+    padding: 18px;
+    overflow: auto;
+  }
+
+  .panel-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    margin-bottom: 10px;
+  }
+
+  /* Variables matemáticas dentro de un label: en la fuente mono,
+     que tiene una α griega distinguible de la 'a' latina
+     (Manrope no incluye griego en su subset de Google Fonts). */
+  .panel-label .var {
+    font-family: var(--font-math);
+  }
+
+  /* ============ COLUMNA 1: PLANO ALPHA ============ */
+  .col-alpha {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .canvas-alpha {
+    aspect-ratio: 1;
+    /* Adaptativo: nunca pasa de 100% del ancho de columna, pero
+       se encoge si la altura del viewport no da para tanto.
+       Los 300px reservan espacio para header, labels, mode-selector,
+       gaps y botones. */
+    width: clamp(140px, calc(100vh - 300px), 100%);
+    margin: 0 auto;
+    background: #fafafa;
+    border: 1px dashed #d0d0d0;
+    border-radius: 4px;
+    position: relative;
+  }
+
+  /* Marcadores en el canvas (posicionados con porcentajes) */
+  .canvas-alpha .ramif,
+  .canvas-alpha .base {
+    position: absolute;
+    transform: translate(-50%, -50%);
+  }
+
+  .canvas-alpha .ramif {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #D55E00;
+    border: 1.5px solid #1a1a1a;
+  }
+
+  .canvas-alpha .base {
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 13px solid #000;
+    margin-top: -2px;
+  }
+
+  .canvas-alpha .label {
+    position: absolute;
+    bottom: 6px;
+    right: 8px;
+    font-size: 11px;
+    color: #b0b0b0;
+    font-style: italic;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 9px 12px;
+    border: 1px solid #d0d0d0;
+    background: #fff;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+  }
+  .btn:hover { background: #fafafa; }
+  .btn.primary {
+    background: #0072B2;
+    color: #fff;
+    border-color: #0072B2;
+  }
+  .btn.primary:hover { background: #005c8f; }
+
+  .loop-list {
+    list-style: none;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .loop-list li {
+    padding: 9px 12px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .loop-list li:last-child { border-bottom: none; }
+  .loop-list li:hover { background: #f7f7f7; }
+  .loop-list .num {
+    color: #888;
+    font-size: 11px;
+    font-family: monospace;
+    width: 18px;
+  }
+  .loop-list .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #56B4E9;
+  }
+  .loop-list .cycle {
+    font-family: var(--font-math);
+    color: #333;
+  }
+
+  /* ============ COLUMNA 2: VIEWPORT 3D ============ */
+  .col-viewport {
+    padding: 0;
+    position: relative;
+    background:
+      radial-gradient(circle at 50% 55%,
+        #ffffff 0%, #f4f4f6 60%, #ececef 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #c0c0c0;
+  }
+
+  .viewport-overlay {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    right: 14px;
+    display: flex;
+    gap: 16px;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .toggle-group {
+    display: flex;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #d8d8d8;
+    border-radius: 6px;
+    overflow: hidden;
+    pointer-events: auto;
+    backdrop-filter: blur(4px);
+  }
+
+  .toggle-group .opt {
+    padding: 7px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #555;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .toggle-group .opt:last-child { border-right: none; }
+  .toggle-group .opt.active {
+    background: #1a1a1a;
+    color: #fff;
+  }
+  .toggle-group .opt.icon {
+    padding: 7px 12px;
+  }
+  .toggle-group .opt svg {
+    display: block;
+  }
+
+  /* Mode selector: componente independiente del .toggle-group. Sin
+     herencias raras, con flex-shrink: 0 para que no se comprima si
+     el canvas (aspect-ratio: 1) consume mucho espacio vertical en
+     la columna flex. */
+  .mode-selector {
+    display: flex;
+    width: 100%;
+    flex-shrink: 0;
+    background: #fff;
+    border: 1px solid #d8d8d8;
+    border-radius: 6px;
+    overflow: hidden;
+    min-height: 38px;
+  }
+
+  .mode-selector .mode {
+    flex: 1;
+    padding: 9px 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #555;
+    background: transparent;
+    border: none;
+    border-right: 1px solid #e0e0e0;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: center;
+  }
+  .mode-selector .mode:last-child {
+    border-right: none;
+  }
+  .mode-selector .mode:hover:not(.active) {
+    background: #f5f5f7;
+  }
+  .mode-selector .mode.active {
+    background: #1a1a1a;
+    color: #fff;
+  }
+
+  .viewport-placeholder {
+    text-align: center;
+  }
+  .viewport-placeholder .surf {
+    font-size: 140px;
+    line-height: 1;
+    color: #d8d8d8;
+  }
+  .viewport-placeholder .caption {
+    margin-top: 14px;
+    font-size: 13px;
+    color: #999;
+    letter-spacing: 0.02em;
+  }
+  .viewport-placeholder .sub {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #bbb;
+  }
+
+  /* ============ COLUMNA 3: PANEL SUBGRUPO ============ */
+  .col-group .field {
+    margin-bottom: 18px;
+  }
+
+  .col-group .field-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #999;
+    margin-bottom: 5px;
+  }
+
+  .col-group .field-value {
+    font-size: 18px;
+    font-weight: 500;
+    color: #1a1a1a;
+  }
+
+  .col-group .field-value.mono {
+    font-family: var(--font-math);
+    font-size: 16px;
+  }
+
+  .col-group .gens {
+    font-family: var(--font-math);
+    font-size: 13px;
+  }
+
+  .col-group .gens .gen {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    border-bottom: 1px dotted #eee;
+  }
+  .col-group .gens .gen:last-child { border-bottom: none; }
+
+  .col-group .gens .index {
+    color: #888;
+    font-size: 11px;
+    width: 20px;
+  }
+
+  .col-group .gens .perm {
+    color: #333;
+  }
+
+  .col-group .orbs {
+    font-family: var(--font-math);
+    font-size: 14px;
+    color: #1a1a1a;
+    background: #f5f5f7;
+    padding: 8px 12px;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <h1>Visualizador de monodromía</h1>
+    <span class="poly">P(x, α) = x⁵ − x + α</span>
+  </header>
+
+  <div class="main">
+
+    <!-- ============ COLUMNA 1: PLANO DE ALPHA ============ -->
+    <div class="panel col-alpha">
+      <div class="panel-label">Modo</div>
+      <div class="mode-selector">
+        <button class="mode active">Manual</button>
+        <button class="mode">Aleatorio</button>
+        <button class="mode">Hauenstein</button>
+      </div>
+
+      <div class="panel-label" style="margin-top: 4px;">Plano de <span class="var">α</span></div>
+
+      <div class="canvas-alpha">
+        <!-- 4 puntos de ramificación a ±r y ±ri -->
+        <div class="ramif" style="top: 50%; left: 85%;"></div>
+        <div class="ramif" style="top: 50%; left: 15%;"></div>
+        <div class="ramif" style="top: 15%; left: 50%;"></div>
+        <div class="ramif" style="top: 85%; left: 50%;"></div>
+        <!-- Punto base en el centro -->
+        <div class="base" style="top: 50%; left: 50%;"></div>
+        <div class="label">dibujo de lazos</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn">Deshacer</button>
+        <button class="btn">Reset</button>
+      </div>
+    </div>
+
+    <!-- ============ COLUMNA 2: VIEWPORT 3D ============ -->
+    <div class="panel col-viewport">
+      <div class="viewport-overlay">
+        <div class="toggle-group">
+          <div class="opt active">Superficie</div>
+          <div class="opt">Trayectorias</div>
+          <div class="opt">Plano x</div>
+        </div>
+        <div style="flex: 1;"></div>
+        <!-- El toggle de cámara solo se muestra en las dos vistas 3D
+             (Superficie o Trayectorias). En Plano x se oculta porque
+             no hay cámara orbital que tenga sentido en 2D. -->
+        <div class="toggle-group camera-toggle">
+          <div class="opt icon active" title="Cámara orbital">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+              <circle cx="12" cy="13" r="3"/>
+            </svg>
+          </div>
+          <div class="opt icon" title="Primera persona">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="viewport-placeholder">
+        <div class="surf">◐</div>
+        <div class="caption">vista 3D (Three.js)</div>
+        <div class="sub">superficie de Riemann + trayectorias de las raíces</div>
+      </div>
+    </div>
+
+    <!-- ============ COLUMNA 3: PANEL SUBGRUPO ============ -->
+    <div class="panel col-group">
+      <div class="panel-label">Subgrupo descubierto</div>
+
+      <div class="field">
+        <div class="field-label">Estructura</div>
+        <div style="font-style: italic; color: #aaa; font-size: 13px;">trivial</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Orden</div>
+        <div class="field-value">1</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Generadores</div>
+        <div class="gens">
+          <div style="font-style: italic; color: #aaa; font-family: var(--font-ui);">
+            ninguno aún
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Órbitas</div>
+        <div class="orbs">{0}&nbsp;&nbsp;{1}&nbsp;&nbsp;{2}&nbsp;&nbsp;{3}&nbsp;&nbsp;{4}</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
