@@ -219,6 +219,14 @@ body {
 }
 
 /* ============ Col 3: subgrupo ============ */
+/* Anula el `overflow: auto` heredado de `.panel`: el panel nunca debe
+   mostrar scrollbar. Los campos van con su alto natural en flujo
+   normal; el `padding-bottom` del panel se eleva a 36 px para que el
+   retículo no quede pegado al borde inferior. */
+.col-group {
+  overflow: hidden;
+  padding-bottom: 36px;
+}
 .col-group .field { margin-bottom: 18px; }
 .col-group .field-label {
   font-size: 10px;
@@ -246,6 +254,12 @@ body {
 .col-group .gens {
   font-family: var(--font-math);
   font-size: 14px;
+  /* Hueco fijo para ≈3 generadores. Se renderiza siempre (incluso
+     en estado vacío) para que el retículo no salte de posición al
+     añadir el primer generador. Si aparecen más, el scroll vive aquí
+     dentro, no en el panel. */
+  height: 80px;
+  overflow-y: auto;
 }
 .col-group .gens .gen {
   display: flex;
@@ -290,14 +304,31 @@ body {
   color: #aaa;
   font-size: 13px;
   font-family: var(--font-ui);
+  /* Centrado vertical dentro del hueco fijo de `.gens` para que el
+     mensaje no quede pegado al borde superior. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
-.col-group .orbs {
-  font-family: var(--font-math);
-  font-size: 14px;
-  color: #1a1a1a;
-  background: #f5f5f7;
-  padding: 8px 12px;
+
+/* Retículo de subgrupos: alto fijo. Como la lista de generadores
+   tiene un alto fijo, añadir generadores no reduce el retículo.
+   `margin-bottom: 36px` directo sobre el view + `padding-bottom`
+   extra del panel = ≥ 72 px de aire bajo el retículo, garantizados
+   incluso si el contenido sobra y `overflow: hidden` recorta. */
+.lattice-view {
+  height: 180px;
+  margin-bottom: 36px;
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
   border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.lattice-view svg {
+  user-select: none;
+  display: block;
 }
 
 /* Tooltip sobre la fila "Estructura" con la información extra de GAP */

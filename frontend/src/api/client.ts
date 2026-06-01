@@ -14,6 +14,19 @@ export interface PolinomioInfo {
   raices_base: ComplejoJSON[];
 }
 
+export interface LatticeNodo {
+  id: number;
+  orden: number;
+  estructura: string;
+  tam_clase: number;
+  es_normal: boolean;
+}
+
+export interface Lattice {
+  nodos: LatticeNodo[];
+  aristas: [number, number][]; // (j, i) → clase j es subgrupo maximal de i
+}
+
 export interface SubgrupoResponse {
   orden: number;
   estructura: string;
@@ -30,6 +43,7 @@ export interface SubgrupoResponse {
   tid?: number | null;
   center_order?: number | null;
   composition_factors?: string[];
+  lattice?: Lattice | null;
 }
 
 export async function getPolinomio(): Promise<PolinomioInfo> {

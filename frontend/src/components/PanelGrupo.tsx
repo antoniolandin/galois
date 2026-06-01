@@ -3,12 +3,15 @@
 // Al hacer hover sobre la fila "Estructura" se despliega un tooltip
 // con propiedades abstractas adicionales que devuelve GAP: si es
 // abeliano, resoluble, nilpotente, transitivo, primitivo, su T-number,
-// el orden de su centro y los factores de composición.
+// el orden de su centro, los factores de composición y las órbitas
+// del subgrupo actuando sobre las raíces. La fila de órbitas se ha
+// movido aquí para dejar más espacio vertical al retículo.
 
 import { useState } from 'react';
 import type { SubgrupoResponse } from '../api/client';
 import type { GeneradorGuardado } from '../App';
 import { formatPerm } from '../galois/monodromia';
+import { LatticeView } from './LatticeView';
 
 interface Props {
   subgrupo: SubgrupoResponse | null;
@@ -127,6 +130,8 @@ export function PanelGrupo({
                     <dd>{formatFactoresComposicion(subgrupo.composition_factors)}</dd>
                   </>
                 )}
+              <dt>Órbitas</dt>
+              <dd>{formatOrbitas(subgrupo.orbitas)}</dd>
             </dl>
           </div>
         )}
@@ -139,11 +144,11 @@ export function PanelGrupo({
 
       <div className="field">
         <div className="field-label">Generadores</div>
-        {empty ? (
-          <div className="gens-empty">ninguno aún</div>
-        ) : (
-          <div className="gens">
-            {generadores.map((g, i) => (
+        <div className="gens">
+          {empty ? (
+            <div className="gens-empty">ninguno aún</div>
+          ) : (
+            generadores.map((g, i) => (
               <div
                 className={'gen' + (selectedIdx === i ? ' selected' : '')}
                 key={i}
@@ -164,17 +169,17 @@ export function PanelGrupo({
                   ×
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="field">
-        <div className="field-label">Órbitas</div>
-        <div className="orbs">
-          {subgrupo ? formatOrbitas(subgrupo.orbitas) : '—'}
+            ))
+          )}
         </div>
       </div>
+
+      {subgrupo?.lattice && (
+        <div className="field lattice-field">
+          <div className="field-label">Retículo de subgrupos</div>
+          <LatticeView lattice={subgrupo.lattice} />
+        </div>
+      )}
     </>
   );
 }
