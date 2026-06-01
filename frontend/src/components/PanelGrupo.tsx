@@ -7,11 +7,15 @@
 
 import { useState } from 'react';
 import type { SubgrupoResponse } from '../api/client';
+import type { GeneradorGuardado } from '../App';
 import { formatPerm } from '../galois/monodromia';
 
 interface Props {
   subgrupo: SubgrupoResponse | null;
-  generadores: number[][];
+  generadores: GeneradorGuardado[];
+  selectedIdx: number | null;
+  onSelect: (idx: number) => void;
+  onDelete: (idx: number) => void;
 }
 
 function formatOrbitas(orbs: number[][]): string {
@@ -59,7 +63,13 @@ function formatFactoresComposicion(factores: string[] | undefined): string {
   return [...factores].reverse().map(formatEstructura).join(' · ');
 }
 
-export function PanelGrupo({ subgrupo, generadores }: Props) {
+export function PanelGrupo({
+  subgrupo,
+  generadores,
+  selectedIdx,
+  onSelect,
+  onDelete,
+}: Props) {
   const [showInfo, setShowInfo] = useState(false);
   const empty = generadores.length === 0;
   const gapAvailable =
@@ -134,9 +144,25 @@ export function PanelGrupo({ subgrupo, generadores }: Props) {
         ) : (
           <div className="gens">
             {generadores.map((g, i) => (
-              <div className="gen" key={i}>
+              <div
+                className={'gen' + (selectedIdx === i ? ' selected' : '')}
+                key={i}
+                onClick={() => onSelect(i)}
+                title="Click para ver el lazo que generó esta permutación"
+              >
                 <span className="index">σ{subindex(i + 1)}</span>
-                <span className="perm">{formatPerm(g)}</span>
+                <span className="perm">{formatPerm(g.permutacion)}</span>
+                <button
+                  className="delete-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(i);
+                  }}
+                  title="Eliminar este generador"
+                  aria-label="Eliminar"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>

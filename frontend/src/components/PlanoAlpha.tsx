@@ -4,17 +4,13 @@
 //
 // Estado caliente (alpha, roots, lazo) en refs para evitar re-render
 // por cada frame del ratón. El tamaño del canvas se lleva en state
-// para que un resize dispare redibujo (evita el bug del viewer en
-// blanco antes del primer evento).
+// para que un resize dispare redibujo.
 //
 // MODO MANUAL LIBRE: el lazo NO se fuerza a empezar en α* = 0. El
-// usuario puede arrastrar desde cualquier punto y dejar α donde
-// quiera. La permutación se extrae únicamente cuando, al soltar el
-// ratón, α ha vuelto suficientemente cerca de α* (tolerancia
-// CLOSE_TOL) — solo entonces tenemos un lazo cerrado y la noción de
-// "permutación inducida" tiene sentido matemático.
+// usuario puede arrastrar desde cualquier punto y la permutación se
+// extrae si el lazo se cierra cerca del punto de inicio.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Complex } from '../galois/complex';
 import { cAbs, cSub } from '../galois/complex';
 import { stepRootsAdaptive } from '../galois/continuacion';
@@ -25,48 +21,87 @@ interface Props {
   ramificacion: Complex[];
   alphaEstrella: Complex;
   currentAlpha: Complex;
+  // Si no es null, el canvas muestra este lazo guardado en lugar del
+  // que el usuario esté dibujando. El hover queda desactivado mientras
+  // tanto; el mousedown deselecciona y arranca un drag nuevo.
+  displayLazo: Complex[] | null;
+  // Cada vez que cambia este número, el componente borra su lazo
+  // interno (Escape lo usa). NO toca alphaRef ni rootsRef, así que
+  // el hover continúa sin teleport.
+  clearLazoSignal: number;
   setAlpha: (a: Complex) => void;
   setRoots: (r: Complex[]) => void;
   setStartRoots: (r: Complex[]) => void;
   pushTrayectoria: (r: Complex[]) => void;
   resetTrayectorias: () => void;
-  onLoopEnd: (finalRoots: Complex[], startRoots: Complex[]) => void;
+  onLoopEnd: (
+    finalRoots: Complex[],
+    startRoots: Complex[],
+    startAlpha: Complex,
+    lazo: Complex[],
+  ) => void;
+  // Avisa al padre cuando el usuario interactúa con el canvas para
+  // que pueda limpiar la selección del generador mostrado, si la había.
+  onInteraction: () => void;
 }
 
-const RANGE = 0.85;
-// Tolerancia para considerar que α ha vuelto al origen (lazo cerrado).
+// Tolerancia para considerar que α ha vuelto al punto de inicio del lazo.
 const CLOSE_TOL = 0.05;
-
-const canvasToAlpha = (px: number, py: number, w: number, h: number): Complex => [
-  (px / w) * (2 * RANGE) - RANGE,
-  -((py / h) * (2 * RANGE) - RANGE),
-];
-
-const alphaToCanvas = (z: Complex, w: number, h: number): [number, number] => [
-  ((z[0] + RANGE) / (2 * RANGE)) * w,
-  ((-z[1] + RANGE) / (2 * RANGE)) * h,
-];
 
 export function PlanoAlpha({
   ramificacion,
   alphaEstrella,
   currentAlpha,
+  displayLazo,
+  clearLazoSignal,
   setAlpha,
   setRoots,
   setStartRoots,
   pushTrayectoria,
   resetTrayectorias,
   onLoopEnd,
+  onInteraction,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDraggingRef = useRef(false);
   const alphaRef = useRef<Complex>([0, 0]);
   const rootsRef = useRef<Complex[]>([...INITIAL_ROOTS]);
-  // Inicio del lazo (mousedown): posición α y raíces en ese punto
   const startAlphaRef = useRef<Complex>([0, 0]);
   const startRootsRef = useRef<Complex[]>([...INITIAL_ROOTS]);
   const [lazo, setLazo] = useState<Complex[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
+
+  // RANGE = 2 · (radio máximo de los puntos de ramificación). Así los
+  // puntos de ramificación se sitúan a la mitad del eje, cualquiera
+  // que sea el polinomio.  Si no hay ramificación (caso degenerado),
+  // se cae a 0.85 que era el valor previo fijo.
+  const RANGE = useMemo(() => {
+    if (ramificacion.length === 0) return 0.85;
+    const maxR = Math.max(...ramificacion.map(cAbs));
+    return maxR * 2;
+  }, [ramificacion]);
+
+  const canvasToAlpha = (px: number, py: number, w: number, h: number): Complex => [
+    (px / w) * (2 * RANGE) - RANGE,
+    -((py / h) * (2 * RANGE) - RANGE),
+  ];
+  const alphaToCanvas = (z: Complex, w: number, h: number): [number, number] => [
+    ((z[0] + RANGE) / (2 * RANGE)) * w,
+    ((-z[1] + RANGE) / (2 * RANGE)) * h,
+  ];
+
+  // Señal de "limpiar lazo" (Escape lo dispara). Sólo borra el array
+  // interno; no toca refs ni notifica al padre. El primer render
+  // (signal inicial 0) no debe hacer nada visible — sólo cuando
+  // realmente cambia.
+  const firstClearRef = useRef(true);
+  useEffect(() => {
+    if (firstClearRef.current) {
+      firstClearRef.current = false;
+      return;
+    }
+    setLazo([]);
+  }, [clearLazoSignal]);
 
   // ResizeObserver: sincroniza el buffer del canvas con el tamaño CSS
   // y mantiene `size` en state para disparar redibujo cuando cambia.
@@ -110,15 +145,17 @@ export function PlanoAlpha({
     ctx.lineTo(c[0], h);
     ctx.stroke();
 
-    // Trazo del lazo en curso
-    if (lazo.length > 1) {
+    // Trazo del lazo: el guardado (si hay generador seleccionado)
+    // tiene prioridad sobre el dibujado en vivo.
+    const visibleLazo = displayLazo ?? lazo;
+    if (visibleLazo.length > 1) {
       ctx.strokeStyle = '#0072B2';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      const p0 = alphaToCanvas(lazo[0], w, h);
+      const p0 = alphaToCanvas(visibleLazo[0], w, h);
       ctx.moveTo(p0[0], p0[1]);
-      for (let i = 1; i < lazo.length; i++) {
-        const p = alphaToCanvas(lazo[i], w, h);
+      for (let i = 1; i < visibleLazo.length; i++) {
+        const p = alphaToCanvas(visibleLazo[i], w, h);
         ctx.lineTo(p[0], p[1]);
       }
       ctx.stroke();
@@ -146,8 +183,9 @@ export function PlanoAlpha({
     ctx.closePath();
     ctx.fill();
 
-    // Posición actual de α (azul) si no está sobre el origen
-    if (cAbs(currentAlpha) > 0.001) {
+    // Posición actual de α (azul), sólo si no estamos mostrando un
+    // lazo guardado y no estamos en el origen.
+    if (displayLazo == null && cAbs(currentAlpha) > 0.001) {
       const [ax, ay] = alphaToCanvas(currentAlpha, w, h);
       ctx.fillStyle = '#0072B2';
       ctx.strokeStyle = '#1a1a1a';
@@ -156,13 +194,18 @@ export function PlanoAlpha({
       ctx.fill();
       ctx.stroke();
     }
-  }, [ramificacion, alphaEstrella, currentAlpha, lazo, size]);
+  }, [ramificacion, alphaEstrella, currentAlpha, lazo, displayLazo, size, RANGE]);
 
   function getMouseAlpha(e: React.MouseEvent<HTMLCanvasElement>): Complex | null {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    return canvasToAlpha(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
+    return canvasToAlpha(
+      e.clientX - rect.left,
+      e.clientY - rect.top,
+      rect.width,
+      rect.height,
+    );
   }
 
   function step(target: Complex) {
@@ -176,11 +219,9 @@ export function PlanoAlpha({
   function onMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
     const target = getMouseAlpha(e);
     if (!target) return;
-    // El click marca el inicio del lazo. Continuamos desde el estado
-    // actual con predictor-corrector (el hover ya estaba siguiendo
-    // las raíces; el click sólo "fija" ese estado como punto de
-    // partida del lazo). Si no había habido hover previo, alphaRef
-    // está en (0, 0) y se hace el paso desde ahí.
+    // Cualquier interacción del usuario deselecciona el generador
+    // mostrado, si lo había.
+    onInteraction();
     rootsRef.current = stepRootsAdaptive(rootsRef.current, alphaRef.current, target);
     alphaRef.current = target;
     startAlphaRef.current = target;
@@ -194,22 +235,17 @@ export function PlanoAlpha({
   }
 
   function onMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
+    // Si estamos mostrando un lazo guardado, el hover está congelado.
+    // Sólo un mousedown (que limpia la selección) reactiva el tracking.
+    if (displayLazo != null && !isDraggingRef.current) return;
     const target = getMouseAlpha(e);
     if (!target) return;
     if (isDraggingRef.current) {
-      // Drag activo: predictor-corrector preserva el etiquetado para
-      // poder extraer la permutación al cerrar.
       step(target);
       setLazo((prev) => [...prev, target]);
     } else {
-      // Hover sin click: usamos predictor-corrector (mismo que el
-      // drag) para que el etiquetado se preserve a lo largo del
-      // camino del ratón. Si usásemos Durand-Kerner + relabel por
-      // proximidad, las raíces "saltarían" al pasar cerca de un
-      // punto de ramificación porque dos raíces vecinas se asignarían
-      // ambas al mismo label canónico. Con tracking continuo, el
-      // intercambio es suave: una raíz cede su color a otra al cruzar
-      // una rama, igual que ocurre durante el dibujo de un lazo.
+      // Hover sin click: predictor-corrector continuo para preservar
+      // etiquetado a lo largo del camino del ratón.
       rootsRef.current = stepRootsAdaptive(rootsRef.current, alphaRef.current, target);
       alphaRef.current = target;
       setAlpha(target);
@@ -221,29 +257,32 @@ export function PlanoAlpha({
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
 
-    // Un lazo "útil" tiene que cumplir dos cosas: (1) cerrar, esto es,
-    // soltar el ratón cerca de donde se empezó, y (2) inducir una
-    // permutación no trivial. Un lazo cerrado pero con permutación
-    // identidad (no encerró ningún punto de ramificación) o un lazo
-    // abierto se descartan y limpiamos toda la visualización.
+    // Un lazo "útil" cierra cerca de donde se empezó Y la permutación
+    // inducida no es la identidad.  Sólo entonces se guarda como
+    // generador y la visualización persiste.
     const dist = cAbs(cSub(alphaRef.current, startAlphaRef.current));
     const cerrado = dist < CLOSE_TOL;
     let utile = false;
     if (cerrado) {
-      const sigma = emparejarPorProximidad(rootsRef.current, startRootsRef.current);
+      const sigma = emparejarPorProximidad(
+        rootsRef.current,
+        startRootsRef.current,
+      );
       utile = !sigma.every((j, i) => j === i);
     }
 
     if (utile) {
-      // Lazo cerrado y con permutación no trivial: cerramos visualmente
-      // el trazo, extraemos la permutación y dejamos todo en pantalla.
-      setLazo((prev) => [...prev, startAlphaRef.current]);
-      onLoopEnd(rootsRef.current, startRootsRef.current);
+      const closedLazo: Complex[] = [...lazo, startAlphaRef.current];
+      setLazo(closedLazo);
+      onLoopEnd(
+        [...rootsRef.current],
+        [...startRootsRef.current],
+        [...startAlphaRef.current] as Complex,
+        closedLazo,
+      );
     } else {
-      // Cualquier otro caso: limpiamos sólo el trazo, las trayectorias
-      // y la marca de huellas, pero dejamos α y las raíces donde
-      // estaban al soltar.  Así no hay "teleport" visual al canónico
-      // — el hover continúa suavemente desde la posición del ratón.
+      // Cualquier otro caso: limpiamos sólo los artefactos del lazo
+      // pero dejamos α y las raíces donde están (evita teleport).
       setLazo([]);
       resetTrayectorias();
       setStartRoots([...INITIAL_ROOTS]);
@@ -251,9 +290,6 @@ export function PlanoAlpha({
   }
 
   function onMouseLeave() {
-    // El ratón sale del canvas. Cancelamos cualquier drag en curso
-    // (sin chequear cierre — sería sospechoso aceptarlo aquí) y
-    // devolvemos las raíces al estado canónico.
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
       setLazo([]);

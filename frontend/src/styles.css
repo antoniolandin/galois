@@ -251,18 +251,40 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 5px 0;
+  padding: 5px 4px 5px 6px;
   border-bottom: 1px dotted #eee;
   cursor: pointer;
+  border-radius: 4px;
 }
-.col-group .gens .gen:hover { background: #f7f7f7; }
+.col-group .gens .gen:hover { background: #f5f5f7; }
 .col-group .gens .gen:last-child { border-bottom: none; }
+.col-group .gens .gen.selected {
+  background: #e8f0f8;
+  border-bottom: 1px solid #c8d8e8;
+}
 .col-group .gens .index {
   color: #666;
   font-size: 14px;
   width: 28px;
 }
-.col-group .gens .perm { color: #1a1a1a; }
+.col-group .gens .perm { color: #1a1a1a; flex: 1; }
+.col-group .gens .delete-btn {
+  visibility: hidden;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: #999;
+  padding: 0 4px;
+  font-family: inherit;
+  border-radius: 3px;
+}
+.col-group .gens .gen:hover .delete-btn { visibility: visible; }
+.col-group .gens .delete-btn:hover {
+  color: #D55E00;
+  background: #fff;
+}
 .col-group .gens-empty {
   font-style: italic;
   color: #aaa;
