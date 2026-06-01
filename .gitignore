@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# uv / virtualenvs
+.venv/
+venv/
+env/
+.python-version
+
+# Distribución / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+wheels/
+pip-wheel-metadata/
+
+# Tests y cobertura
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Linters y type checkers
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE / editores
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Configuración local y secretos
+.env
+.env.local
+.env.*.local
+
+# Artefactos de Trame / cachés del servidor
+.cache/
+server-data/
+
+# Capturas y exportaciones generadas por la app
+capturas/
+exports/
+
+# Recursos pesados (mover aquí lo que no deba versionarse)
+recursos/

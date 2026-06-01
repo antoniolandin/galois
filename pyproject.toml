@@ -1,0 +1,19 @@
+[project]
+name = "galois"
+version = "0.1.0"
+description = "Visualizador interactivo del grupo de Galois por monodromia"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "sympy>=1.12",
+    "plotly>=5.20",
+    "trame>=3.4",
+    "trame-plotly>=3.0",
+    "trame-vuetify>=2.4",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
