@@ -42,7 +42,10 @@ def test_latencia_get_polinomio(client, capsys):
 
 
 # ---------------------------------------------------------------------
-# POST /api/grupo - calcular subgrupo desde 4 generadores debe ser < 200ms
+# POST /api/grupo - identificación de subgrupo + retículo completo.
+# La query GAP calcula StructureDescription, propiedades abstractas y
+# el retículo de subgrupos (LatticeSubgroups + clases + maximales),
+# por lo que la latencia warm es del orden de cientos de ms.
 # ---------------------------------------------------------------------
 def test_latencia_post_grupo_s5(client, capsys):
     payload = {
@@ -63,7 +66,7 @@ def test_latencia_post_grupo_s5(client, capsys):
     with capsys.disabled():
         print(f"\n  POST /api/grupo (S_5): "
               f"media {media * 1000:6.2f}ms,  mejor {mejor * 1000:6.2f}ms")
-    assert mejor < 0.2
+    assert mejor < 0.5
 
 
 # ---------------------------------------------------------------------

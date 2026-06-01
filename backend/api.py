@@ -144,6 +144,7 @@ def grupo(req: SubgrupoRequest) -> SubgrupoResponse:
             tid=gap_info["tid"],
             center_order=gap_info["center_order"],
             composition_factors=gap_info["composition_factors"],
+            lattice=gap_info.get("lattice"),
         )
 
     # Fallback sympy: campos extra quedan en None / [].

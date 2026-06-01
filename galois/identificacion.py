@@ -137,7 +137,32 @@ def _construir_script(
         f"if trans and n <= 48 then\n"
         f'    Print("TID:", TransitiveIdentification(G), "\\n");\n'
         f'    Print("PRIM:", IsPrimitive(G, [1..n]), "\\n");\n'
-        f"fi;"
+        f"fi;\n"
+        # --- Retículo de subgrupos (por clases de conjugación) ---
+        # Usamos @ como delimitador entre campos de LC porque la
+        # estructura puede contener ":" (p. ej. "C5 : C4", grupo de
+        # Frobenius F_20). Y "@" no aparece en StructureDescription.
+        f"L := LatticeSubgroups(G);;\n"
+        f"cc := ConjugacyClassesSubgroups(L);;\n"
+        f"nl := Length(cc);;\n"
+        f'Print("LN:", nl, "\\n");\n'
+        f"for i in [1..nl] do\n"
+        f"    rep := Representative(cc[i]);;\n"
+        f'    Print("LC@", i, "@", Order(rep), "@", StructureDescription(rep), "@", Size(cc[i]), "@", IsNormal(G, rep), "\\n");\n'
+        f"od;\n"
+        f"for i in [1..nl] do\n"
+        f"    rep := Representative(cc[i]);;\n"
+        f"    if Order(rep) > 1 then\n"
+        f"        for m in MaximalSubgroupClassReps(rep) do\n"
+        f"            for j in [1..nl] do\n"
+        f"                if m in cc[j] then\n"
+        f'                    Print("LE@", j, "@", i, "\\n");\n'
+        f"                    break;\n"
+        f"                fi;\n"
+        f"            od;\n"
+        f"        od;\n"
+        f"    fi;\n"
+        f"od;"
     )
 
 
@@ -207,6 +232,18 @@ def identificar_grupo_via_gap(
             "tid": None,
             "center_order": 1,
             "composition_factors": [],
+            "lattice": {
+                "nodos": [
+                    {
+                        "id": 1,
+                        "orden": 1,
+                        "estructura": "trivial",
+                        "tam_clase": 1,
+                        "es_normal": True,
+                    }
+                ],
+                "aristas": [],
+            },
         }
 
     script = _construir_script(generadores, grado)
@@ -215,11 +252,21 @@ def identificar_grupo_via_gap(
         return None
 
     fields: dict[str, str] = {}
+    # Líneas LC (nodos del retículo) y LE (aristas) las recogemos
+    # aparte porque hay una por nodo / arista, no una sola por tag.
+    lattice_nodes_lines: list[str] = []
+    lattice_edge_lines: list[str] = []
     for line in output.splitlines():
         line = line.strip()
+        if line.startswith("LC@"):
+            lattice_nodes_lines.append(line[3:])
+            continue
+        if line.startswith("LE@"):
+            lattice_edge_lines.append(line[3:])
+            continue
         for tag in (
             "ORD", "DESC", "ABEL", "SOLV", "NILP", "PERF", "SIMP",
-            "CENT", "CF", "TRAN", "TID", "PRIM",
+            "CENT", "CF", "TRAN", "TID", "PRIM", "LN",
         ):
             if line.startswith(f"{tag}:"):
                 fields[tag] = line[len(tag) + 1:].strip()
@@ -248,6 +295,38 @@ def identificar_grupo_via_gap(
         except ValueError:
             pass
 
+    # Parsear nodos del retículo: cada línea LC tiene el formato
+    # "id:orden:estructura:tam_clase:es_normal".
+    nodos = []
+    for raw in lattice_nodes_lines:
+        parts = raw.split("@")
+        if len(parts) < 5:
+            continue
+        try:
+            nodos.append({
+                "id": int(parts[0]),
+                "orden": int(parts[1]),
+                "estructura": _normalizar_estructura(parts[2]),
+                "tam_clase": int(parts[3]),
+                "es_normal": parts[4].strip().lower() == "true",
+            })
+        except ValueError:
+            continue
+
+    # Aristas: cada línea LE tiene el formato "j@i" (clase j es
+    # subgrupo maximal de clase i). Pueden venir duplicadas; las
+    # deduplicamos por par.
+    aristas_set: set[tuple[int, int]] = set()
+    for raw in lattice_edge_lines:
+        parts = raw.split("@")
+        if len(parts) < 2:
+            continue
+        try:
+            aristas_set.add((int(parts[0]), int(parts[1])))
+        except ValueError:
+            continue
+    aristas = sorted(aristas_set)
+
     return {
         "estructura": _normalizar_estructura(fields["DESC"]),
         "orden": orden,
@@ -261,4 +340,5 @@ def identificar_grupo_via_gap(
         "tid": tid,
         "center_order": center_order,
         "composition_factors": composition_factors,
+        "lattice": {"nodos": nodos, "aristas": list(aristas)},
     }

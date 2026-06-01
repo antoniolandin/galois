@@ -78,6 +78,19 @@ class SubgrupoRequest(BaseModel):
     grado: int = Field(..., ge=1)
 
 
+class LatticeNodo(BaseModel):
+    id: int
+    orden: int
+    estructura: str
+    tam_clase: int  # número de subgrupos conjugados en esta clase
+    es_normal: bool
+
+
+class Lattice(BaseModel):
+    nodos: list[LatticeNodo]
+    aristas: list[tuple[int, int]]  # (j, i): clase j es subgrupo maximal de i
+
+
 class SubgrupoResponse(BaseModel):
     orden: int
     estructura: str
@@ -94,3 +107,4 @@ class SubgrupoResponse(BaseModel):
     tid: int | None = None
     center_order: int | None = None
     composition_factors: list[str] = []
+    lattice: Lattice | None = None
