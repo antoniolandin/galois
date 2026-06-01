@@ -240,14 +240,13 @@ export function PlanoAlpha({
       setLazo((prev) => [...prev, startAlphaRef.current]);
       onLoopEnd(rootsRef.current, startRootsRef.current);
     } else {
-      // Cualquier otro caso: limpieza completa.
-      rootsRef.current = [...INITIAL_ROOTS];
-      alphaRef.current = [0, 0];
-      setAlpha([0, 0]);
-      setRoots([...INITIAL_ROOTS]);
-      setStartRoots([...INITIAL_ROOTS]);
+      // Cualquier otro caso: limpiamos sólo el trazo, las trayectorias
+      // y la marca de huellas, pero dejamos α y las raíces donde
+      // estaban al soltar.  Así no hay "teleport" visual al canónico
+      // — el hover continúa suavemente desde la posición del ratón.
       setLazo([]);
       resetTrayectorias();
+      setStartRoots([...INITIAL_ROOTS]);
     }
   }
 
