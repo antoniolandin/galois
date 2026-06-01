@@ -5,10 +5,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Complex } from '../galois/complex';
-import { BRANCH_X, INITIAL_ROOTS, ROOT_COLORS, DEGREE } from '../galois/polinomio';
+import { BRANCH_X, ROOT_COLORS, DEGREE } from '../galois/polinomio';
 
 interface Props {
   roots: Complex[];
+  // Posiciones de las raíces en el inicio del lazo actual (las que
+  // marcaba el ratón al hacer click). Se pintan como huellas huecas
+  // grises. Si no hay lazo en curso, coinciden con INITIAL_ROOTS.
+  startRoots: Complex[];
   trayectorias: Complex[][];
 }
 
@@ -19,7 +23,7 @@ const xToCanvas = (z: Complex, w: number, h: number): [number, number] => [
   ((-z[1] + RANGE) / (2 * RANGE)) * h,
 ];
 
-export function PlanoX({ roots, trayectorias }: Props) {
+export function PlanoX({ roots, startRoots, trayectorias }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Dimensiones CSS del canvas. Las llevamos en state para que un
   // cambio de tamaño dispare el useEffect de dibujo, y no quede el
@@ -65,10 +69,11 @@ export function PlanoX({ roots, trayectorias }: Props) {
     ctx.lineTo(c[0], h);
     ctx.stroke();
 
-    // Huellas: círculos huecos en posiciones iniciales
+    // Huellas: círculos huecos en las posiciones de las raíces
+    // donde EMPEZÓ el lazo actual (el último mousedown).
     ctx.strokeStyle = '#cccccc';
     ctx.lineWidth = 1;
-    for (const r0 of INITIAL_ROOTS) {
+    for (const r0 of startRoots) {
       const [px, py] = xToCanvas(r0, w, h);
       ctx.beginPath();
       ctx.arc(px, py, 9, 0, 2 * Math.PI);
@@ -76,8 +81,9 @@ export function PlanoX({ roots, trayectorias }: Props) {
     }
 
     // Lugar de ramificación: raíces dobles donde dos raíces colapsan.
-    // Mismo estilo que los puntos de ramificación del plano α
-    // (círculos bermellón con borde negro).
+    // Dibujados con opacidad reducida para indicar que son contexto
+    // visual, no las raíces actuales (que aparecen sólidas).
+    ctx.globalAlpha = 0.4;
     ctx.fillStyle = '#D55E00';
     ctx.strokeStyle = '#1a1a1a';
     ctx.lineWidth = 1.4;
@@ -88,6 +94,7 @@ export function PlanoX({ roots, trayectorias }: Props) {
       ctx.fill();
       ctx.stroke();
     }
+    ctx.globalAlpha = 1;
 
     // Trayectorias: polilínea por raíz en su color, opacidad media
     if (trayectorias.length === DEGREE && trayectorias[0].length > 1) {

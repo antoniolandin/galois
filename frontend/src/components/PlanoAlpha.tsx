@@ -27,6 +27,7 @@ interface Props {
   currentAlpha: Complex;
   setAlpha: (a: Complex) => void;
   setRoots: (r: Complex[]) => void;
+  setStartRoots: (r: Complex[]) => void;
   pushTrayectoria: (r: Complex[]) => void;
   resetTrayectorias: () => void;
   onLoopEnd: (finalRoots: Complex[], startRoots: Complex[]) => void;
@@ -52,6 +53,7 @@ export function PlanoAlpha({
   currentAlpha,
   setAlpha,
   setRoots,
+  setStartRoots,
   pushTrayectoria,
   resetTrayectorias,
   onLoopEnd,
@@ -184,6 +186,7 @@ export function PlanoAlpha({
     isDraggingRef.current = true;
     setAlpha(target);
     setRoots(rootsAtStart);
+    setStartRoots([...rootsAtStart]);
     setLazo([target]);
     resetTrayectorias();
   }
@@ -200,22 +203,25 @@ export function PlanoAlpha({
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
 
-    // El lazo está cerrado si soltamos cerca de donde empezamos.
     const dist = cAbs(cSub(alphaRef.current, startAlphaRef.current));
     if (dist < CLOSE_TOL) {
-      // Cerrar visualmente el trazo
+      // Lazo CERRADO: cerramos visualmente el trazo, extraemos
+      // permutación y dejamos el estado tal cual (raíces en la
+      // posición final permutada, lazo y huellas visibles).
       setLazo((prev) => [...prev, startAlphaRef.current]);
-      // Extraer permutación localmente: raíces actuales vs. raíces
-      // en el punto de inicio.
       onLoopEnd(rootsRef.current, startRootsRef.current);
+    } else {
+      // Lazo NO cerrado: limpiamos todo. Raíces vuelven al canónico,
+      // el trazo desaparece, trayectorias se borran. Las huellas del
+      // plano x vuelven a las posiciones canónicas (α* = 0).
+      rootsRef.current = [...INITIAL_ROOTS];
+      alphaRef.current = [0, 0];
+      setAlpha([0, 0]);
+      setRoots([...INITIAL_ROOTS]);
+      setStartRoots([...INITIAL_ROOTS]);
+      setLazo([]);
+      resetTrayectorias();
     }
-    // En todos los casos, devolver el visor al estado canónico:
-    // α = 0 y raíces en sus posiciones iniciales.
-    rootsRef.current = [...INITIAL_ROOTS];
-    alphaRef.current = [0, 0];
-    setAlpha([0, 0]);
-    setRoots([...INITIAL_ROOTS]);
-    setTimeout(() => setLazo([]), 600);
   }
 
   return (

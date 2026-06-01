@@ -22,6 +22,9 @@ export default function App() {
 
   const [currentAlpha, setCurrentAlpha] = useState<Complex>([0, 0]);
   const [currentRoots, setCurrentRoots] = useState<Complex[]>([...INITIAL_ROOTS]);
+  // Posiciones de las raíces en el punto de inicio del último lazo.
+  // Se muestran como huellas grises huecas en el plano x.
+  const [startRoots, setStartRoots] = useState<Complex[]>([...INITIAL_ROOTS]);
   const [trayectorias, setTrayectorias] = useState<Complex[][]>(() =>
     INITIAL_ROOTS.map(() => [] as Complex[]),
   );
@@ -72,9 +75,10 @@ export default function App() {
           return isDup ? prev : [...prev, asignacion];
         });
       }
-      setTimeout(() => resetTrayectorias(), 600);
+      // No limpiar trayectorias aquí — quedan visibles en el plano x
+      // hasta el siguiente mousedown (que ya llama a resetTrayectorias).
     },
-    [resetTrayectorias],
+    [],
   );
 
   const handleDeshacer = useCallback(() => {
@@ -121,6 +125,7 @@ export default function App() {
             currentAlpha={currentAlpha}
             setAlpha={setCurrentAlpha}
             setRoots={setCurrentRoots}
+            setStartRoots={setStartRoots}
             pushTrayectoria={pushTrayectoria}
             resetTrayectorias={resetTrayectorias}
             onLoopEnd={handleLoopEnd}
@@ -148,7 +153,11 @@ export default function App() {
         <div className="panel col-viewport">
           <ViewToggle view={view} onChange={setView} />
           {view === 'plano-x' ? (
-            <PlanoX roots={currentRoots} trayectorias={trayectorias} />
+            <PlanoX
+              roots={currentRoots}
+              startRoots={startRoots}
+              trayectorias={trayectorias}
+            />
           ) : (
             <div className="viewport-placeholder">
               <div className="icon">◐</div>
