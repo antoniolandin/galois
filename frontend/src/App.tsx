@@ -103,6 +103,38 @@ export default function App() {
     setResetKey((k) => k + 1);
   }, [resetTrayectorias]);
 
+  // Escape limpia el estado visual del lazo (trazo, trayectorias,
+  // huellas, raíces) sin tocar los generadores ya descubiertos.
+  const handleEscape = useCallback(() => {
+    setCurrentAlpha([0, 0]);
+    setCurrentRoots([...INITIAL_ROOTS]);
+    setStartRoots([...INITIAL_ROOTS]);
+    resetTrayectorias();
+    setResetKey((k) => k + 1);
+  }, [resetTrayectorias]);
+
+  // Atajos de teclado:
+  //   Ctrl/Cmd + Z → Deshacer (sólo si hay generadores).
+  //   Escape       → Limpiar lazos visibles (conserva generadores).
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        if (generadores.length === 0) return;
+        e.preventDefault();
+        handleDeshacer();
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleEscape();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleDeshacer, handleEscape, generadores.length]);
+
   if (!polinomio) {
     return (
       <div className="app">
