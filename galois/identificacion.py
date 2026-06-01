@@ -121,14 +121,22 @@ def _construir_script(
     return (
         f"G := Group({gens_gap});;\n"
         f"n := {grado};;\n"
-        f"ord := Order(G);;\n"
-        f"desc := StructureDescription(G);;\n"
+        f'Print("ORD:", Order(G), "\\n");\n'
+        f'Print("DESC:", StructureDescription(G), "\\n");\n'
+        f'Print("ABEL:", IsAbelian(G), "\\n");\n'
+        f'Print("SOLV:", IsSolvable(G), "\\n");\n'
+        f'Print("NILP:", IsNilpotent(G), "\\n");\n'
+        f'Print("PERF:", IsPerfect(G), "\\n");\n'
+        f'Print("SIMP:", IsSimple(G), "\\n");\n'
+        f'Print("CENT:", Order(Center(G)), "\\n");\n'
+        f"cs := CompositionSeries(G);;\n"
+        f"cf := List([1..Length(cs)-1], i -> StructureDescription(cs[i]/cs[i+1]));;\n"
+        f'Print("CF:", JoinStringsWithSeparator(cf, "|"), "\\n");\n'
         f"trans := IsTransitive(G, [1..n]);;\n"
-        f'Print("ORD:", ord, "\\n");\n'
-        f'Print("DESC:", desc, "\\n");\n'
+        f'Print("TRAN:", trans, "\\n");\n'
         f"if trans and n <= 48 then\n"
-        f"    tid := TransitiveIdentification(G);;\n"
-        f'    Print("TID:", tid, "\\n");\n'
+        f'    Print("TID:", TransitiveIdentification(G), "\\n");\n'
+        f'    Print("PRIM:", IsPrimitive(G, [1..n]), "\\n");\n'
         f"fi;"
     )
 
@@ -158,45 +166,99 @@ def _normalizar_estructura(desc: str) -> str:
 
 
 # -- API pública -----------------------------------------------------
+def _parsear_bool(s: str) -> bool | None:
+    s = s.strip().lower()
+    if s == "true":
+        return True
+    if s == "false":
+        return False
+    return None
+
+
 def identificar_grupo_via_gap(
     generadores: Sequence[comb.Permutation],
     grado: int,
 ) -> dict | None:
-    """Identifica el subgrupo via GAP. Devuelve dict con `estructura`,
-    `orden` y `tid` (T-number de TransitiveIdentification, o None si
-    no es transitivo o grado > 48). Devuelve None si GAP no responde.
+    """Identifica el subgrupo via GAP. Devuelve un dict con:
+    - `estructura`: descripción normalizada (`S_5`, `D_5`, etc.).
+    - `orden`: cardinal del subgrupo.
+    - `is_abelian`, `is_solvable`, `is_nilpotent`, `is_perfect`,
+      `is_simple`: booleanos.
+    - `is_transitive`: bool.
+    - `is_primitive`: bool o None (solo si transitivo y grado ≤ 48).
+    - `tid`: T-number de TransitiveIdentification o None.
+    - `center_order`: orden del centro Z(G).
+    - `composition_factors`: lista de descripciones de los factores
+      de la serie de composición, ya normalizadas.
+
+    Devuelve None si GAP no responde correctamente o no está disponible.
     """
     if not generadores:
-        return {"estructura": "trivial", "orden": 1, "tid": None}
+        return {
+            "estructura": "trivial",
+            "orden": 1,
+            "is_abelian": True,
+            "is_solvable": True,
+            "is_nilpotent": True,
+            "is_perfect": True,
+            "is_simple": False,
+            "is_transitive": False,
+            "is_primitive": None,
+            "tid": None,
+            "center_order": 1,
+            "composition_factors": [],
+        }
 
     script = _construir_script(generadores, grado)
     output = _gap.query(script)
     if output is None:
         return None
 
-    orden: int | None = None
-    desc: str | None = None
-    tid: int | None = None
+    fields: dict[str, str] = {}
     for line in output.splitlines():
         line = line.strip()
-        if line.startswith("ORD:"):
-            try:
-                orden = int(line[4:].strip())
-            except ValueError:
-                pass
-        elif line.startswith("DESC:"):
-            desc = line[5:].strip()
-        elif line.startswith("TID:"):
-            try:
-                tid = int(line[4:].strip())
-            except ValueError:
-                pass
+        for tag in (
+            "ORD", "DESC", "ABEL", "SOLV", "NILP", "PERF", "SIMP",
+            "CENT", "CF", "TRAN", "TID", "PRIM",
+        ):
+            if line.startswith(f"{tag}:"):
+                fields[tag] = line[len(tag) + 1:].strip()
+                break
 
-    if orden is None or desc is None:
+    if "ORD" not in fields or "DESC" not in fields:
         return None
 
+    try:
+        orden = int(fields["ORD"])
+        center_order = int(fields["CENT"])
+    except (ValueError, KeyError):
+        return None
+
+    cf_raw = fields.get("CF", "")
+    composition_factors = (
+        [_normalizar_estructura(c) for c in cf_raw.split("|") if c]
+        if cf_raw
+        else []
+    )
+
+    tid = None
+    if "TID" in fields:
+        try:
+            tid = int(fields["TID"])
+        except ValueError:
+            pass
+
     return {
-        "estructura": _normalizar_estructura(desc),
+        "estructura": _normalizar_estructura(fields["DESC"]),
         "orden": orden,
+        "is_abelian": _parsear_bool(fields.get("ABEL", "")),
+        "is_solvable": _parsear_bool(fields.get("SOLV", "")),
+        "is_nilpotent": _parsear_bool(fields.get("NILP", "")),
+        "is_perfect": _parsear_bool(fields.get("PERF", "")),
+        "is_simple": _parsear_bool(fields.get("SIMP", "")),
+        "is_transitive": _parsear_bool(fields.get("TRAN", "")),
+        "is_primitive": _parsear_bool(fields["PRIM"]) if "PRIM" in fields else None,
         "tid": tid,
+        "center_order": center_order,
+        "composition_factors": composition_factors,
     }

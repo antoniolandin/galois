@@ -17,7 +17,19 @@ export interface PolinomioInfo {
 export interface SubgrupoResponse {
   orden: number;
   estructura: string;
+  grado: number;
   orbitas: number[][];
+  // Campos extra de GAP (null si GAP no respondió).
+  is_abelian?: boolean | null;
+  is_solvable?: boolean | null;
+  is_nilpotent?: boolean | null;
+  is_perfect?: boolean | null;
+  is_simple?: boolean | null;
+  is_transitive?: boolean | null;
+  is_primitive?: boolean | null;
+  tid?: number | null;
+  center_order?: number | null;
+  composition_factors?: string[];
 }
 
 export async function getPolinomio(): Promise<PolinomioInfo> {

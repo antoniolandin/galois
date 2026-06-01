@@ -81,4 +81,16 @@ class SubgrupoRequest(BaseModel):
 class SubgrupoResponse(BaseModel):
     orden: int
     estructura: str
+    grado: int
     orbitas: list[list[int]]
+    # Información adicional que GAP devuelve (None si GAP no disponible).
+    is_abelian: bool | None = None
+    is_solvable: bool | None = None
+    is_nilpotent: bool | None = None
+    is_perfect: bool | None = None
+    is_simple: bool | None = None
+    is_transitive: bool | None = None
+    is_primitive: bool | None = None
+    tid: int | None = None
+    center_order: int | None = None
+    composition_factors: list[str] = []

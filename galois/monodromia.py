@@ -100,25 +100,17 @@ def describir_grupo(
     n: int,
     generadores: Sequence[comb.Permutation] | None = None,
 ) -> str:
-    """Identificacion abstracta del subgrupo.
+    """Identificacion sympy-only del subgrupo. Cubre los casos basicos:
+    trivial, S_n, A_n, ciclico, diedrico. Se usa como fallback cuando
+    GAP no esta disponible; la API normalmente llama directamente a
+    `identificar_grupo_via_gap` (en `galois.identificacion`).
 
-    Estrategia: intentar primero GAP via subproceso (cubre la mayoria
-    de los grupos via `StructureDescription`). Si GAP no esta
-    disponible o falla, caer al identificador sympy basico.
-
-    `generadores` puede pasarse para evitar reconstruirlos desde
-    `grupo.generators` (que sympy puede haber reordenado o canonizado).
-    """
+    Sympy 1.14 no expone `is_alt` como propiedad publica; se detecta
+    A_n combinando orden = n!/2 con que todos los generadores sean
+    permutaciones pares (G ⊆ A_n)."""
     if generadores is None:
         generadores = list(grupo.generators)
-    # Filtrar la identidad: GAP no la necesita y empeora la descripcion.
-    generadores_no_triv = [g for g in generadores if g.cyclic_form]
 
-    gap_info = identificar_grupo_via_gap(generadores_no_triv, n)
-    if gap_info is not None:
-        return gap_info["estructura"]
-
-    # Fallback sympy: cubre casos basicos cuando GAP no esta.
     orden = grupo.order()
     factorial_n = math.factorial(n)
 

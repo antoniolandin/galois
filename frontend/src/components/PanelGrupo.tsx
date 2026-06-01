@@ -1,5 +1,11 @@
 // Panel derecho: información del subgrupo descubierto.
+//
+// Al hacer hover sobre la fila "Estructura" se despliega un tooltip
+// con propiedades abstractas adicionales que devuelve GAP: si es
+// abeliano, resoluble, nilpotente, transitivo, primitivo, su T-number,
+// el orden de su centro y los factores de composición.
 
+import { useState } from 'react';
 import type { SubgrupoResponse } from '../api/client';
 import { formatPerm } from '../galois/monodromia';
 
@@ -20,9 +26,7 @@ function formatOrbitas(orbs: number[][]): string {
 //   · " x " → " × " (producto directo Unicode).
 //   · " : " → " ⋊ " (producto semidirecto Unicode).
 function formatEstructura(s: string): string {
-  let out = s.replace(/C_(\d+)/g, (_, digits: string) =>
-    'ℤ_' + digits,
-  );
+  let out = s.replace(/C_(\d+)/g, (_, digits: string) => 'ℤ_' + digits);
   out = out.replace(/_(\d+)/g, (_, digits: string) =>
     digits.split('').map((d) => SUB_DIGITS[parseInt(d, 10)]).join(''),
   );
@@ -30,18 +34,92 @@ function formatEstructura(s: string): string {
   return out;
 }
 
+const SUB_DIGITS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+function subindex(n: number): string {
+  return String(n)
+    .split('')
+    .map((d) => SUB_DIGITS[parseInt(d, 10)])
+    .join('');
+}
+
+const formatBool = (b: boolean | null | undefined): string =>
+  b === true ? 'sí' : b === false ? 'no' : '—';
+
+function formatCenter(orden: number | null | undefined): string {
+  if (orden == null) return '—';
+  if (orden === 1) return 'trivial';
+  return String(orden);
+}
+
+function formatFactoresComposicion(factores: string[] | undefined): string {
+  if (!factores || factores.length === 0) return '—';
+  // Se muestran de "abajo arriba": el primer factor de GAP es el
+  // cociente más alto de la serie; al darle la vuelta queda primero
+  // el factor minimal. Para S_5 sale "A_5 · ℤ_2".
+  return [...factores].reverse().map(formatEstructura).join(' · ');
+}
+
 export function PanelGrupo({ subgrupo, generadores }: Props) {
+  const [showInfo, setShowInfo] = useState(false);
   const empty = generadores.length === 0;
+  const gapAvailable =
+    subgrupo != null && subgrupo.is_solvable !== null && subgrupo.is_solvable !== undefined;
 
   return (
     <>
       <div className="panel-label">Subgrupo descubierto</div>
 
-      <div className="field">
+      <div
+        className="field has-tooltip"
+        onMouseEnter={() => setShowInfo(true)}
+        onMouseLeave={() => setShowInfo(false)}
+      >
         <div className="field-label">Estructura</div>
         <div className={'field-value mono' + (empty ? ' empty' : '')}>
           {subgrupo ? formatEstructura(subgrupo.estructura) : '—'}
         </div>
+
+        {showInfo && gapAvailable && subgrupo && (
+          <div className="tooltip">
+            <dl>
+              {subgrupo.tid != null && (
+                <>
+                  <dt>T-number</dt>
+                  <dd>
+                    {subgrupo.grado}T{subgrupo.tid}
+                  </dd>
+                </>
+              )}
+              <dt>Abeliano</dt>
+              <dd>{formatBool(subgrupo.is_abelian)}</dd>
+              <dt>Resoluble</dt>
+              <dd>{formatBool(subgrupo.is_solvable)}</dd>
+              <dt>Nilpotente</dt>
+              <dd>{formatBool(subgrupo.is_nilpotent)}</dd>
+              <dt>Simple</dt>
+              <dd>{formatBool(subgrupo.is_simple)}</dd>
+              <dt>Perfecto</dt>
+              <dd>{formatBool(subgrupo.is_perfect)}</dd>
+              <dt>Transitivo</dt>
+              <dd>{formatBool(subgrupo.is_transitive)}</dd>
+              {subgrupo.is_primitive != null && (
+                <>
+                  <dt>Primitivo</dt>
+                  <dd>{formatBool(subgrupo.is_primitive)}</dd>
+                </>
+              )}
+              <dt>Centro</dt>
+              <dd>{formatCenter(subgrupo.center_order)}</dd>
+              {subgrupo.composition_factors &&
+                subgrupo.composition_factors.length > 0 && (
+                  <>
+                    <dt>Factores</dt>
+                    <dd>{formatFactoresComposicion(subgrupo.composition_factors)}</dd>
+                  </>
+                )}
+            </dl>
+          </div>
+        )}
       </div>
 
       <div className="field">
@@ -73,13 +151,4 @@ export function PanelGrupo({ subgrupo, generadores }: Props) {
       </div>
     </>
   );
-}
-
-// "1" → "₁", etc. (Unicode subíndices)
-const SUB_DIGITS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
-function subindex(n: number): string {
-  return String(n)
-    .split('')
-    .map((d) => SUB_DIGITS[parseInt(d, 10)])
-    .join('');
 }

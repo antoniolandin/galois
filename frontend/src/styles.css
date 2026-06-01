@@ -277,3 +277,36 @@ body {
   padding: 8px 12px;
   border-radius: 4px;
 }
+
+/* Tooltip sobre la fila "Estructura" con la información extra de GAP */
+.col-group .field.has-tooltip {
+  position: relative;
+}
+.col-group .tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  font-size: 12px;
+}
+.col-group .tooltip dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  margin: 0;
+}
+.col-group .tooltip dt {
+  color: #888;
+  font-weight: 600;
+}
+.col-group .tooltip dd {
+  color: #1a1a1a;
+  font-family: var(--font-math);
+  margin: 0;
+}

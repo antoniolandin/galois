@@ -13,6 +13,7 @@ import numpy as np
 import sympy.combinatorics as comb
 from fastapi import FastAPI, HTTPException
 
+from galois.identificacion import identificar_grupo_via_gap
 from galois.monodromia import (
     describir_grupo,
     orbitas,
@@ -121,8 +122,34 @@ def grupo(req: SubgrupoRequest) -> SubgrupoResponse:
 
     generadores = [comb.Permutation(g, size=req.grado) for g in req.generadores]
     G = subgrupo_generado(generadores, req.grado)
+    orbs = [sorted(o) for o in orbitas(G)]
+
+    # Intentamos GAP primero para obtener la descripción completa.
+    # Si GAP no responde, caemos a describir_grupo (sympy básico).
+    generadores_no_triv = [g for g in generadores if g.cyclic_form]
+    gap_info = identificar_grupo_via_gap(generadores_no_triv, req.grado)
+    if gap_info is not None:
+        return SubgrupoResponse(
+            orden=gap_info["orden"],
+            estructura=gap_info["estructura"],
+            grado=req.grado,
+            orbitas=orbs,
+            is_abelian=gap_info["is_abelian"],
+            is_solvable=gap_info["is_solvable"],
+            is_nilpotent=gap_info["is_nilpotent"],
+            is_perfect=gap_info["is_perfect"],
+            is_simple=gap_info["is_simple"],
+            is_transitive=gap_info["is_transitive"],
+            is_primitive=gap_info["is_primitive"],
+            tid=gap_info["tid"],
+            center_order=gap_info["center_order"],
+            composition_factors=gap_info["composition_factors"],
+        )
+
+    # Fallback sympy: campos extra quedan en None / [].
     return SubgrupoResponse(
         orden=G.order(),
         estructura=describir_grupo(G, req.grado, generadores=generadores),
-        orbitas=[sorted(o) for o in orbitas(G)],
+        grado=req.grado,
+        orbitas=orbs,
     )
