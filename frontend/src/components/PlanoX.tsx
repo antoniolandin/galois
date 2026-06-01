@@ -31,6 +31,8 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
   // cambio de tamaño dispare el useEffect de dibujo, y no quede el
   // canvas en blanco hasta que algo más cambie.
   const [size, setSize] = useState({ w: 0, h: 0 });
+  // Índice de la raíz sobre la que está el ratón (o null si fuera).
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -137,13 +139,76 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
       ctx.fill();
       ctx.stroke();
     }
-  }, [roots, trayectorias, size]);
+
+    // Etiqueta con el índice de la raíz sobre la que está el ratón.
+    // Se intenta poner en la esquina superior derecha de la raíz;
+    // si se saldría del canvas, se voltea por el eje correspondiente.
+    if (hoveredIdx != null && hoveredIdx < roots.length) {
+      const [rx, ry] = xToCanvas(roots[hoveredIdx], w, h);
+      const text = String(hoveredIdx);
+      ctx.font = 'bold 13px "Manrope", -apple-system, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      const tw = ctx.measureText(text).width;
+      const pad = 4;
+      const boxW = Math.max(tw + pad * 2, 18);
+      const boxH = 18;
+      const dx = 14;
+      const dy = 10;
+      // Posición por defecto: arriba-derecha. Se voltea cada eje si
+      // la caja se saldría del canvas.
+      let lx = rx + dx;
+      let ly = ry - dy;
+      if (lx + boxW / 2 > w) lx = rx - dx;
+      if (ly - boxH / 2 < 0) ly = ry + dy;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(lx - boxW / 2, ly - boxH / 2, boxW, boxH, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText(text, lx, ly);
+    }
+  }, [roots, trayectorias, size, hoveredIdx]);
+
+  // Pixel-hit detection: el cursor está sobre una raíz si la
+  // distancia al centro de su círculo es menor que su radio + un
+  // pequeño margen (12 px total, suficiente para que sea fácil de
+  // pegar sin que se solapen las raíces cercanas).
+  function onMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    let best = -1;
+    let bestDist = 12;
+    for (let k = 0; k < roots.length; k++) {
+      const [rx, ry] = xToCanvas(roots[k], rect.width, rect.height);
+      const dx = mx - rx;
+      const dy = my - ry;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bestDist) {
+        bestDist = d;
+        best = k;
+      }
+    }
+    setHoveredIdx(best === -1 ? null : best);
+  }
+
+  function onMouseLeave() {
+    setHoveredIdx(null);
+  }
 
   return (
     <canvas
       ref={canvasRef}
       className="canvas-x"
       style={{ width: 'min(70vh, 100%)', aspectRatio: '1' }}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
     />
   );
 }
