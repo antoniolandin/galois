@@ -16,7 +16,9 @@ interface Props {
   trayectorias: Complex[][];
 }
 
-const RANGE = 1.5;
+// Rango del plano x: span [-RANGE, +RANGE].  Más pequeño hace que
+// los lazos pequeños alrededor de cada raíz se aprecien mejor.
+const RANGE = 1.15;
 
 const xToCanvas = (z: Complex, w: number, h: number): [number, number] => [
   ((z[0] + RANGE) / (2 * RANGE)) * w,
@@ -69,17 +71,6 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
     ctx.lineTo(c[0], h);
     ctx.stroke();
 
-    // Huellas: círculos huecos en las posiciones de las raíces
-    // donde EMPEZÓ el lazo actual (el último mousedown).
-    ctx.strokeStyle = '#cccccc';
-    ctx.lineWidth = 1;
-    for (const r0 of startRoots) {
-      const [px, py] = xToCanvas(r0, w, h);
-      ctx.beginPath();
-      ctx.arc(px, py, 9, 0, 2 * Math.PI);
-      ctx.stroke();
-    }
-
     // Lugar de ramificación: raíces dobles donde dos raíces colapsan.
     // Dibujados con opacidad reducida para indicar que son contexto
     // visual, no las raíces actuales (que aparecen sólidas).
@@ -96,14 +87,33 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
     }
     ctx.globalAlpha = 1;
 
-    // Trayectorias: polilínea por raíz en su color, opacidad media
-    if (trayectorias.length === DEGREE && trayectorias[0].length > 1) {
-      ctx.lineWidth = 2;
+    // Huellas + trayectorias: solo cuando hay un lazo activo
+    // (durante el drag) o un lazo cerrado-útil cuyo estado se
+    // mantiene en pantalla. En modo hover, sin lazo en curso, no
+    // pintamos las huellas — solo los puntos de ramificación y
+    // las raíces actuales.
+    const hayLazo =
+      trayectorias.length === DEGREE && trayectorias[0].length > 1;
+    if (hayLazo) {
+      // Huellas: posiciones de las raíces al inicio del lazo
+      ctx.strokeStyle = '#cccccc';
+      ctx.lineWidth = 1;
+      for (const r0 of startRoots) {
+        const [px, py] = xToCanvas(r0, w, h);
+        ctx.beginPath();
+        ctx.arc(px, py, 7, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
+
+      // Trayectorias: polilínea por raíz en su color
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       for (let k = 0; k < DEGREE; k++) {
         const traj = trayectorias[k];
         if (traj.length < 2) continue;
         ctx.strokeStyle = ROOT_COLORS[k];
-        ctx.globalAlpha = 0.55;
+        ctx.globalAlpha = 0.75;
         ctx.beginPath();
         const p0 = xToCanvas(traj[0], w, h);
         ctx.moveTo(p0[0], p0[1]);
@@ -118,12 +128,12 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
 
     // Raíces actuales: círculos llenos
     ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.4;
     for (let k = 0; k < roots.length; k++) {
       const [px, py] = xToCanvas(roots[k], w, h);
       ctx.fillStyle = ROOT_COLORS[k];
       ctx.beginPath();
-      ctx.arc(px, py, 9, 0, 2 * Math.PI);
+      ctx.arc(px, py, 7, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
     }

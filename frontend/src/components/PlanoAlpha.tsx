@@ -18,8 +18,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { Complex } from '../galois/complex';
 import { cAbs, cSub } from '../galois/complex';
 import { stepRootsAdaptive } from '../galois/continuacion';
+import { emparejarPorProximidad } from '../galois/monodromia';
 import { INITIAL_ROOTS } from '../galois/polinomio';
-import { rootsAt } from '../galois/raices';
 
 interface Props {
   ramificacion: Complex[];
@@ -176,44 +176,71 @@ export function PlanoAlpha({
   function onMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
     const target = getMouseAlpha(e);
     if (!target) return;
-    // El click marca el INICIO del lazo. Calculamos las raíces en
-    // esa posición con Durand-Kerner (no continuamos desde antes).
-    const rootsAtStart = rootsAt(target);
-    rootsRef.current = rootsAtStart;
+    // El click marca el inicio del lazo. Continuamos desde el estado
+    // actual con predictor-corrector (el hover ya estaba siguiendo
+    // las raíces; el click sólo "fija" ese estado como punto de
+    // partida del lazo). Si no había habido hover previo, alphaRef
+    // está en (0, 0) y se hace el paso desde ahí.
+    rootsRef.current = stepRootsAdaptive(rootsRef.current, alphaRef.current, target);
     alphaRef.current = target;
     startAlphaRef.current = target;
-    startRootsRef.current = [...rootsAtStart];
+    startRootsRef.current = [...rootsRef.current];
     isDraggingRef.current = true;
     setAlpha(target);
-    setRoots(rootsAtStart);
-    setStartRoots([...rootsAtStart]);
+    setRoots(rootsRef.current);
+    setStartRoots([...rootsRef.current]);
     setLazo([target]);
     resetTrayectorias();
   }
 
   function onMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
-    if (!isDraggingRef.current) return;
     const target = getMouseAlpha(e);
     if (!target) return;
-    step(target);
-    setLazo((prev) => [...prev, target]);
+    if (isDraggingRef.current) {
+      // Drag activo: predictor-corrector preserva el etiquetado para
+      // poder extraer la permutación al cerrar.
+      step(target);
+      setLazo((prev) => [...prev, target]);
+    } else {
+      // Hover sin click: usamos predictor-corrector (mismo que el
+      // drag) para que el etiquetado se preserve a lo largo del
+      // camino del ratón. Si usásemos Durand-Kerner + relabel por
+      // proximidad, las raíces "saltarían" al pasar cerca de un
+      // punto de ramificación porque dos raíces vecinas se asignarían
+      // ambas al mismo label canónico. Con tracking continuo, el
+      // intercambio es suave: una raíz cede su color a otra al cruzar
+      // una rama, igual que ocurre durante el dibujo de un lazo.
+      rootsRef.current = stepRootsAdaptive(rootsRef.current, alphaRef.current, target);
+      alphaRef.current = target;
+      setAlpha(target);
+      setRoots(rootsRef.current);
+    }
   }
 
   function onMouseUp() {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
 
+    // Un lazo "útil" tiene que cumplir dos cosas: (1) cerrar, esto es,
+    // soltar el ratón cerca de donde se empezó, y (2) inducir una
+    // permutación no trivial. Un lazo cerrado pero con permutación
+    // identidad (no encerró ningún punto de ramificación) o un lazo
+    // abierto se descartan y limpiamos toda la visualización.
     const dist = cAbs(cSub(alphaRef.current, startAlphaRef.current));
-    if (dist < CLOSE_TOL) {
-      // Lazo CERRADO: cerramos visualmente el trazo, extraemos
-      // permutación y dejamos el estado tal cual (raíces en la
-      // posición final permutada, lazo y huellas visibles).
+    const cerrado = dist < CLOSE_TOL;
+    let utile = false;
+    if (cerrado) {
+      const sigma = emparejarPorProximidad(rootsRef.current, startRootsRef.current);
+      utile = !sigma.every((j, i) => j === i);
+    }
+
+    if (utile) {
+      // Lazo cerrado y con permutación no trivial: cerramos visualmente
+      // el trazo, extraemos la permutación y dejamos todo en pantalla.
       setLazo((prev) => [...prev, startAlphaRef.current]);
       onLoopEnd(rootsRef.current, startRootsRef.current);
     } else {
-      // Lazo NO cerrado: limpiamos todo. Raíces vuelven al canónico,
-      // el trazo desaparece, trayectorias se borran. Las huellas del
-      // plano x vuelven a las posiciones canónicas (α* = 0).
+      // Cualquier otro caso: limpieza completa.
       rootsRef.current = [...INITIAL_ROOTS];
       alphaRef.current = [0, 0];
       setAlpha([0, 0]);
@@ -224,6 +251,22 @@ export function PlanoAlpha({
     }
   }
 
+  function onMouseLeave() {
+    // El ratón sale del canvas. Cancelamos cualquier drag en curso
+    // (sin chequear cierre — sería sospechoso aceptarlo aquí) y
+    // devolvemos las raíces al estado canónico.
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      setLazo([]);
+      resetTrayectorias();
+      setStartRoots([...INITIAL_ROOTS]);
+    }
+    rootsRef.current = [...INITIAL_ROOTS];
+    alphaRef.current = [0, 0];
+    setAlpha([0, 0]);
+    setRoots([...INITIAL_ROOTS]);
+  }
+
   return (
     <canvas
       ref={canvasRef}
@@ -231,7 +274,7 @@ export function PlanoAlpha({
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
-      onMouseLeave={onMouseUp}
+      onMouseLeave={onMouseLeave}
     />
   );
 }

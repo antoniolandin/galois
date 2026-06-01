@@ -31,6 +31,9 @@ export default function App() {
 
   const [generadores, setGeneradores] = useState<number[][]>([]);
   const [subgrupo, setSubgrupo] = useState<SubgrupoResponse | null>(null);
+  // Bump al pulsar Reset; usado como `key` del PlanoAlpha para forzar
+  // remount y descartar el estado interno (refs, lazo en curso).
+  const [resetKey, setResetKey] = useState(0);
 
   // Cargar info del polinomio al montar
   useEffect(() => {
@@ -83,10 +86,22 @@ export default function App() {
 
   const handleDeshacer = useCallback(() => {
     setGeneradores((prev) => prev.slice(0, -1));
-  }, []);
+    setCurrentAlpha([0, 0]);
+    setCurrentRoots([...INITIAL_ROOTS]);
+    setStartRoots([...INITIAL_ROOTS]);
+    resetTrayectorias();
+    setResetKey((k) => k + 1);
+  }, [resetTrayectorias]);
   const handleReset = useCallback(() => {
     setGeneradores([]);
-  }, []);
+    setCurrentAlpha([0, 0]);
+    setCurrentRoots([...INITIAL_ROOTS]);
+    setStartRoots([...INITIAL_ROOTS]);
+    resetTrayectorias();
+    // Forzar remount de PlanoAlpha para descartar refs internos y
+    // el lazo visible que vive en su estado local.
+    setResetKey((k) => k + 1);
+  }, [resetTrayectorias]);
 
   if (!polinomio) {
     return (
@@ -120,6 +135,7 @@ export default function App() {
             Plano de <span className="var">α</span>
           </div>
           <PlanoAlpha
+            key={resetKey}
             ramificacion={ramificacion}
             alphaEstrella={alphaEstrella}
             currentAlpha={currentAlpha}
@@ -139,11 +155,7 @@ export default function App() {
             >
               Deshacer
             </button>
-            <button
-              className="btn"
-              onClick={handleReset}
-              disabled={generadores.length === 0}
-            >
+            <button className="btn" onClick={handleReset}>
               Reset
             </button>
           </div>
