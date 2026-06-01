@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Spike: predictor-corrector en JS, tiempo real</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: #f5f5f7;
+    color: #1a1a1a;
+    padding: 24px;
+    margin: 0;
+  }
+  h1 { font-size: 18px; margin: 0 0 14px 0; font-weight: 500; }
+  .info {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #555;
+    max-width: 880px;
+    margin-bottom: 22px;
+  }
+  code {
+    font-family: "Fira Code", "JetBrains Mono", monospace;
+    background: #e8e8eb;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+  .grid { display: flex; gap: 24px; align-items: flex-start; }
+  .pane { display: flex; flex-direction: column; gap: 6px; }
+  .label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  canvas {
+    background: #ffffff;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    cursor: crosshair;
+    display: block;
+  }
+  .stats {
+    margin-top: 24px;
+    display: flex;
+    gap: 22px;
+    align-items: center;
+  }
+  .fps-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .fps-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  #fps-value {
+    font-size: 36px;
+    font-weight: bold;
+    line-height: 1;
+    color: #009E73;
+    font-variant-numeric: tabular-nums;
+    font-family: "Fira Code", "JetBrains Mono", monospace;
+  }
+  .veredicto {
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    background: #f0f0f3;
+    color: #555;
+  }
+</style>
+</head>
+<body>
+
+<h1>Spike: predictor-corrector en JS, tiempo real</h1>
+
+<p class="info">
+  Mantén el botón izquierdo del ratón pulsado sobre el plano α (izquierda) y
+  arrastra. Las 5 raíces de <code>P(x, α) = x⁵ − x + α</code> se actualizan en
+  tiempo real en el plano x (derecha) mediante predictor (Euler) + corrector
+  (Newton). El contador FPS de abajo refleja la tasa de refresco real.
+  Si supera los 50 fps mientras arrastras agresivamente, la opción B (port
+  del predictor-corrector a JS) es viable. Si cae a 30-50, marginal. Si baja
+  de 30, hay que pensárselo.
+</p>
+
+<div class="grid">
+  <div class="pane">
+    <div class="label">Plano α  ·  arrastra aquí</div>
+    <canvas id="alpha" width="380" height="380"></canvas>
+  </div>
+  <div class="pane">
+    <div class="label">Plano x  ·  las 5 raíces</div>
+    <canvas id="x" width="380" height="380"></canvas>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="fps-block">
+    <div class="fps-label">FPS (media móvil)</div>
+    <div id="fps-value">--</div>
+  </div>
+  <div class="veredicto" id="veredicto">Arrastra el ratón para medir.</div>
+</div>
+
+<script>
+// ====================================================================
+// Aritmética compleja: representamos un complejo como [re, im].
+// ====================================================================
+const cAdd  = (a, b) => [a[0] + b[0], a[1] + b[1]];
+const cSub  = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const cMul  = (a, b) => [a[0]*b[0] - a[1]*b[1], a[0]*b[1] + a[1]*b[0]];
+const cDiv  = (a, b) => {
+  const d = b[0]*b[0] + b[1]*b[1];
+  return [(a[0]*b[0] + a[1]*b[1]) / d, (a[1]*b[0] - a[0]*b[1]) / d];
+};
+const cNeg  = (a)    => [-a[0], -a[1]];
+const cAbs  = (a)    => Math.sqrt(a[0]*a[0] + a[1]*a[1]);
+const cPow  = (a, n) => {
+  let r = [1, 0];
+  for (let i = 0; i < n; i++) r = cMul(r, a);
+  return r;
+};
+
+// ====================================================================
+// Polinomio canónico: P(x, α) = x⁵ − x + α
+//   ∂P/∂x = 5x⁴ − 1
+//   ∂P/∂α = 1
+// ====================================================================
+const ONE  = [1, 0];
+const FIVE = [5, 0];
+
+const P  = (x, a) => cAdd(cSub(cPow(x, 5), x), a);
+const Px = (x)    => cSub(cMul(FIVE, cPow(x, 4)), ONE);
+const Pa = ()     => ONE;
+
+// ====================================================================
+// Un paso del predictor-corrector
+// ====================================================================
+function eulerStep(x_k, alpha_k, alpha_kp1) {
+  // dx/dα = -P_α / P_x
+  const dx_da = cNeg(cDiv(Pa(), Px(x_k)));
+  const da = cSub(alpha_kp1, alpha_k);
+  return cAdd(x_k, cMul(dx_da, da));
+}
+
+function newtonCorrect(x_pred, alpha, tol = 1e-12, maxIter = 30) {
+  let x = x_pred;
+  for (let i = 0; i < maxIter; i++) {
+    const pv = P(x, alpha);
+    if (cAbs(pv) < tol) return x;
+    const der = Px(x);
+    if (cAbs(der) < 1e-15) break;  // raíz doble, no se puede continuar
+    x = cSub(x, cDiv(pv, der));
+  }
+  return x;
+}
+
+function stepRoot(x_k, alpha_k, alpha_kp1) {
+  const x_pred = eulerStep(x_k, alpha_k, alpha_kp1);
+  return newtonCorrect(x_pred, alpha_kp1);
+}
+
+// Subdivisión adaptativa: si el delta entre alpha y newAlpha es grande,
+// partimos el paso en tramos pequeños para que Newton converja siempre.
+const MAX_DELTA = 0.05;
+function stepRootsAdaptive(roots, alpha, newAlpha) {
+  const dAlpha = cSub(newAlpha, alpha);
+  const dist = cAbs(dAlpha);
+  if (dist < MAX_DELTA) {
+    return roots.map(r => stepRoot(r, alpha, newAlpha));
+  }
+  const n = Math.ceil(dist / MAX_DELTA);
+  let cur = roots;
+  let curAlpha = alpha;
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    const interp = [alpha[0] + dAlpha[0] * t, alpha[1] + dAlpha[1] * t];
+    cur = cur.map(r => stepRoot(r, curAlpha, interp));
+    curAlpha = interp;
+  }
+  return cur;
+}
+
+// ====================================================================
+// Estado de la simulación
+// ====================================================================
+// Puntos de ramificación: ceros del discriminante.
+// Para x⁵ − x + α, Disc = 3125 α⁴ − 256, raíces en α = r·{1, i, -1, -i}
+// con r = 4 / 5^(5/4) ≈ 0.5350.
+const r = 4.0 / Math.pow(5.0, 5.0 / 4.0);
+const BRANCH_POINTS = [
+  [r, 0], [-r, 0], [0, r], [0, -r],
+];
+
+// Las 5 raíces de x⁵ − x = x(x⁴ − 1) en α* = 0 son 0, ±1, ±i.
+const INITIAL_ROOTS = [
+  [0, 0], [1, 0], [-1, 0], [0, 1], [0, -1],
+];
+const ROOT_COLORS = ['#000000', '#56B4E9', '#E69F00', '#009E73', '#CC79A7'];
+
+let alpha = [0, 0];
+let roots = INITIAL_ROOTS.map(r => [...r]);
+let isDragging = false;
+
+// ====================================================================
+// Canvas y mapeo de coordenadas
+// ====================================================================
+const alphaCanvas = document.getElementById('alpha');
+const xCanvas     = document.getElementById('x');
+const aCtx = alphaCanvas.getContext('2d');
+const xCtx = xCanvas.getContext('2d');
+
+const ALPHA_RANGE = 0.85;
+const X_RANGE     = 1.5;
+
+function alphaToCanvas(z) {
+  const w = alphaCanvas.width, h = alphaCanvas.height;
+  return [
+    ((z[0] + ALPHA_RANGE) / (2 * ALPHA_RANGE)) * w,
+    ((-z[1] + ALPHA_RANGE) / (2 * ALPHA_RANGE)) * h,
+  ];
+}
+function canvasToAlpha(px, py) {
+  const w = alphaCanvas.width, h = alphaCanvas.height;
+  return [
+    (px / w) * (2 * ALPHA_RANGE) - ALPHA_RANGE,
+    -((py / h) * (2 * ALPHA_RANGE) - ALPHA_RANGE),
+  ];
+}
+function xToCanvas(z) {
+  const w = xCanvas.width, h = xCanvas.height;
+  return [
+    ((z[0] + X_RANGE) / (2 * X_RANGE)) * w,
+    ((-z[1] + X_RANGE) / (2 * X_RANGE)) * h,
+  ];
+}
+
+// ====================================================================
+// Mouse events
+// ====================================================================
+function resetState() {
+  alpha = [0, 0];
+  roots = INITIAL_ROOTS.map(r => [...r]);
+}
+function moveAlphaTo(target) {
+  roots = stepRootsAdaptive(roots, alpha, target);
+  alpha = target;
+}
+
+alphaCanvas.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  resetState();
+  const rect = alphaCanvas.getBoundingClientRect();
+  const target = canvasToAlpha(e.clientX - rect.left, e.clientY - rect.top);
+  moveAlphaTo(target);
+});
+alphaCanvas.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const rect = alphaCanvas.getBoundingClientRect();
+  const target = canvasToAlpha(e.clientX - rect.left, e.clientY - rect.top);
+  moveAlphaTo(target);
+});
+alphaCanvas.addEventListener('mouseup',    () => { isDragging = false; });
+alphaCanvas.addEventListener('mouseleave', () => { isDragging = false; });
+
+// ====================================================================
+// Render
+// ====================================================================
+function drawAlphaPlane() {
+  aCtx.clearRect(0, 0, alphaCanvas.width, alphaCanvas.height);
+
+  // Ejes
+  aCtx.strokeStyle = '#e8e8eb';
+  aCtx.lineWidth = 1;
+  aCtx.beginPath();
+  const center = alphaToCanvas([0, 0]);
+  aCtx.moveTo(0, center[1]);
+  aCtx.lineTo(alphaCanvas.width, center[1]);
+  aCtx.moveTo(center[0], 0);
+  aCtx.lineTo(center[0], alphaCanvas.height);
+  aCtx.stroke();
+
+  // Puntos de ramificación
+  aCtx.fillStyle = '#D55E00';
+  aCtx.strokeStyle = '#1a1a1a';
+  aCtx.lineWidth = 1.4;
+  for (const b of BRANCH_POINTS) {
+    const [bx, by] = alphaToCanvas(b);
+    aCtx.beginPath();
+    aCtx.arc(bx, by, 7, 0, 2 * Math.PI);
+    aCtx.fill();
+    aCtx.stroke();
+  }
+
+  // Punto base α* = 0 (triángulo negro)
+  const [tx, ty] = alphaToCanvas([0, 0]);
+  aCtx.fillStyle = '#000000';
+  aCtx.beginPath();
+  aCtx.moveTo(tx, ty - 9);
+  aCtx.lineTo(tx - 7, ty + 5);
+  aCtx.lineTo(tx + 7, ty + 5);
+  aCtx.closePath();
+  aCtx.fill();
+
+  // Posición actual de α (azul) si no estamos en el origen
+  if (cAbs(alpha) > 0.001) {
+    const [ax, ay] = alphaToCanvas(alpha);
+    aCtx.fillStyle = '#0072B2';
+    aCtx.strokeStyle = '#1a1a1a';
+    aCtx.beginPath();
+    aCtx.arc(ax, ay, 5, 0, 2 * Math.PI);
+    aCtx.fill();
+    aCtx.stroke();
+  }
+}
+
+function drawXPlane() {
+  xCtx.clearRect(0, 0, xCanvas.width, xCanvas.height);
+
+  // Ejes
+  xCtx.strokeStyle = '#e8e8eb';
+  xCtx.lineWidth = 1;
+  xCtx.beginPath();
+  const center = xToCanvas([0, 0]);
+  xCtx.moveTo(0, center[1]);
+  xCtx.lineTo(xCanvas.width, center[1]);
+  xCtx.moveTo(center[0], 0);
+  xCtx.lineTo(center[0], xCanvas.height);
+  xCtx.stroke();
+
+  // Posiciones iniciales (huellas grises)
+  xCtx.strokeStyle = '#cccccc';
+  xCtx.lineWidth = 1;
+  xCtx.fillStyle = 'transparent';
+  for (let i = 0; i < INITIAL_ROOTS.length; i++) {
+    const [rx, ry] = xToCanvas(INITIAL_ROOTS[i]);
+    xCtx.beginPath();
+    xCtx.arc(rx, ry, 8, 0, 2 * Math.PI);
+    xCtx.stroke();
+  }
+
+  // Las 5 raíces actuales
+  xCtx.strokeStyle = '#1a1a1a';
+  xCtx.lineWidth = 1.4;
+  for (let i = 0; i < roots.length; i++) {
+    const [rx, ry] = xToCanvas(roots[i]);
+    xCtx.fillStyle = ROOT_COLORS[i];
+    xCtx.beginPath();
+    xCtx.arc(rx, ry, 8, 0, 2 * Math.PI);
+    xCtx.fill();
+    xCtx.stroke();
+  }
+}
+
+// ====================================================================
+// FPS counter con media móvil
+// ====================================================================
+const fpsEl = document.getElementById('fps-value');
+const verEl = document.getElementById('veredicto');
+let fpsBuffer = [];
+let lastFrameTime = performance.now();
+
+function updateFPS() {
+  const now = performance.now();
+  const delta = now - lastFrameTime;
+  lastFrameTime = now;
+  if (delta <= 0) return;
+  const fps = 1000 / delta;
+  fpsBuffer.push(fps);
+  if (fpsBuffer.length > 30) fpsBuffer.shift();
+  const avg = fpsBuffer.reduce((a, b) => a + b, 0) / fpsBuffer.length;
+  fpsEl.textContent = avg.toFixed(0);
+  if (avg >= 50) {
+    fpsEl.style.color = '#009E73';
+    verEl.textContent = 'Opción B viable — el navegador sostiene 60 fps.';
+    verEl.style.background = '#e8f5e9';
+    verEl.style.color = '#1b5e20';
+  } else if (avg >= 30) {
+    fpsEl.style.color = '#E69F00';
+    verEl.textContent = 'Marginal — 30-50 fps, perceptible pero usable.';
+    verEl.style.background = '#fff3e0';
+    verEl.style.color = '#7c4a00';
+  } else {
+    fpsEl.style.color = '#D55E00';
+    verEl.textContent = 'Insuficiente — caer a opción A (backend con throttling).';
+    verEl.style.background = '#fdecea';
+    verEl.style.color = '#7a1700';
+  }
+}
+
+// ====================================================================
+// Loop principal: re-renderizar a cada frame
+// ====================================================================
+function loop() {
+  updateFPS();
+  drawAlphaPlane();
+  drawXPlane();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+</body>
+</html>

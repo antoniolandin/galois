@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Spike: superficie de Riemann + Three.js, tiempo real</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: #f5f5f7;
+    color: #1a1a1a;
+    padding: 24px;
+    margin: 0;
+  }
+  h1 { font-size: 18px; margin: 0 0 14px 0; font-weight: 500; }
+  .info {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #555;
+    max-width: 920px;
+    margin-bottom: 22px;
+  }
+  code {
+    font-family: "Fira Code", "JetBrains Mono", monospace;
+    background: #e8e8eb;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+  .grid { display: flex; gap: 24px; align-items: flex-start; }
+  .pane { display: flex; flex-direction: column; gap: 6px; }
+  .label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  canvas, #threejs {
+    background: #ffffff;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    display: block;
+  }
+  #alpha { cursor: crosshair; }
+  #threejs { cursor: grab; }
+  #threejs:active { cursor: grabbing; }
+  .stats {
+    margin-top: 24px;
+    display: flex;
+    gap: 22px;
+    align-items: center;
+  }
+  .fps-block { display: flex; flex-direction: column; gap: 2px; }
+  .fps-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  #fps-value {
+    font-size: 36px;
+    font-weight: bold;
+    line-height: 1;
+    color: #009E73;
+    font-variant-numeric: tabular-nums;
+    font-family: "Fira Code", "JetBrains Mono", monospace;
+  }
+  .veredicto {
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    background: #f0f0f3;
+    color: #555;
+  }
+  #loading {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: #ffffff;
+    padding: 20px 30px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #555;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.1);
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<h1>Spike: superficie de Riemann + Three.js, tiempo real</h1>
+
+<p class="info">
+  La superficie es la nube de puntos <code>(Re α, h(x), Im α)</code> con
+  <code>h(x) = Re(x) + 0.5 · Im(x)</code> (misma función altura que la fig 2.8
+  del TFG). Se calcula al cargar con Durand-Kerner, 80×80 muestras × 5 hojas
+  = 32 000 puntos. Arrastra sobre el plano α (izquierda) y los 5 marcadores
+  esféricos se mueven en tiempo real sobre la superficie 3D (derecha).
+  Usa el ratón sobre la vista 3D para girar (orbital) y la rueda para zoom.
+  Si el contador FPS de abajo se mantiene en verde mientras arrastras α y
+  giras la cámara a la vez, la opción B sigue siendo viable también con la
+  capa 3D encima.
+</p>
+
+<div class="grid">
+  <div class="pane">
+    <div class="label">Plano α  ·  arrastra aquí</div>
+    <canvas id="alpha" width="380" height="380"></canvas>
+  </div>
+  <div class="pane">
+    <div class="label">Superficie de Riemann  ·  Three.js</div>
+    <div id="threejs" style="width: 480px; height: 480px;"></div>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="fps-block">
+    <div class="fps-label">FPS (media móvil)</div>
+    <div id="fps-value">--</div>
+  </div>
+  <div class="veredicto" id="veredicto">Esperando interacción.</div>
+</div>
+
+<div id="loading">Generando superficie…</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ====================================================================
+// Aritmética compleja
+// ====================================================================
+const cAdd  = (a, b) => [a[0] + b[0], a[1] + b[1]];
+const cSub  = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const cMul  = (a, b) => [a[0]*b[0] - a[1]*b[1], a[0]*b[1] + a[1]*b[0]];
+const cDiv  = (a, b) => {
+  const d = b[0]*b[0] + b[1]*b[1];
+  return [(a[0]*b[0] + a[1]*b[1]) / d, (a[1]*b[0] - a[0]*b[1]) / d];
+};
+const cNeg = (a) => [-a[0], -a[1]];
+const cAbs = (a) => Math.sqrt(a[0]*a[0] + a[1]*a[1]);
+const cPow = (a, n) => {
+  let r = [1, 0];
+  for (let i = 0; i < n; i++) r = cMul(r, a);
+  return r;
+};
+
+// Polinomio P(x, α) = x⁵ − x + α
+const ONE = [1, 0], FIVE = [5, 0];
+const P  = (x, a) => cAdd(cSub(cPow(x, 5), x), a);
+const Px = (x)    => cSub(cMul(FIVE, cPow(x, 4)), ONE);
+const Pa = ()     => ONE;
+
+// ====================================================================
+// Durand-Kerner: encuentra las 5 raíces de P(x, α) para α fijo.
+// Initial guesses cerca de las raíces conocidas en α = 0.
+// ====================================================================
+function durandKerner(alpha, initial, maxIter = 60, tol = 1e-11) {
+  const n = initial.length;
+  let z = initial.map(g => [...g]);
+  for (let iter = 0; iter < maxIter; iter++) {
+    let maxChange = 0;
+    const newZ = [];
+    for (let i = 0; i < n; i++) {
+      const pv = P(z[i], alpha);
+      let denom = [1, 0];
+      for (let j = 0; j < n; j++) {
+        if (j === i) continue;
+        denom = cMul(denom, cSub(z[i], z[j]));
+      }
+      const corr = cDiv(pv, denom);
+      newZ.push(cSub(z[i], corr));
+      maxChange = Math.max(maxChange, cAbs(corr));
+    }
+    z = newZ;
+    if (maxChange < tol) break;
+  }
+  return z;
+}
+
+// ====================================================================
+// Predictor-corrector para tracking en vivo (igual que primer spike)
+// ====================================================================
+function eulerStep(x_k, alpha_k, alpha_kp1) {
+  const dx_da = cNeg(cDiv(Pa(), Px(x_k)));
+  const da = cSub(alpha_kp1, alpha_k);
+  return cAdd(x_k, cMul(dx_da, da));
+}
+function newtonCorrect(x_pred, alpha, tol = 1e-12, maxIter = 30) {
+  let x = x_pred;
+  for (let i = 0; i < maxIter; i++) {
+    const pv = P(x, alpha);
+    if (cAbs(pv) < tol) return x;
+    const der = Px(x);
+    if (cAbs(der) < 1e-15) break;
+    x = cSub(x, cDiv(pv, der));
+  }
+  return x;
+}
+function stepRoot(x_k, a_k, a_kp1) {
+  return newtonCorrect(eulerStep(x_k, a_k, a_kp1), a_kp1);
+}
+const MAX_DELTA = 0.05;
+function stepRootsAdaptive(roots, alpha, newAlpha) {
+  const dA = cSub(newAlpha, alpha);
+  const dist = cAbs(dA);
+  if (dist < MAX_DELTA) return roots.map(r => stepRoot(r, alpha, newAlpha));
+  const n = Math.ceil(dist / MAX_DELTA);
+  let cur = roots, curA = alpha;
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    const interp = [alpha[0] + dA[0] * t, alpha[1] + dA[1] * t];
+    cur = cur.map(r => stepRoot(r, curA, interp));
+    curA = interp;
+  }
+  return cur;
+}
+
+// ====================================================================
+// Estado y constantes
+// ====================================================================
+const r = 4.0 / Math.pow(5.0, 5.0 / 4.0);
+const BRANCH_POINTS = [[r,0], [-r,0], [0,r], [0,-r]];
+const INITIAL_ROOTS = [[0,0], [1,0], [-1,0], [0,1], [0,-1]];
+const ROOT_COLORS_HEX = [0x000000, 0x56B4E9, 0xE69F00, 0x009E73, 0xCC79A7];
+const ROOT_COLORS_CSS = ['#000000', '#56B4E9', '#E69F00', '#009E73', '#CC79A7'];
+
+let currentAlpha = [0, 0];
+let currentRoots = INITIAL_ROOTS.map(r => [...r]);
+let isDragging = false;
+
+// Función altura: h(x) = Re(x) + 0.5 · Im(x)
+const h = (x) => x[0] + 0.5 * x[1];
+
+// Asignación de raíz a "hoja" por proximidad a la raíz inicial
+function sheetOf(root) {
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < INITIAL_ROOTS.length; i++) {
+    const d = cAbs(cSub(root, INITIAL_ROOTS[i]));
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+// ====================================================================
+// Plano α: canvas 2D + handlers de ratón
+// ====================================================================
+const alphaCanvas = document.getElementById('alpha');
+const aCtx = alphaCanvas.getContext('2d');
+const ALPHA_RANGE = 0.85;
+
+function canvasToAlpha(px, py) {
+  const w = alphaCanvas.width, hC = alphaCanvas.height;
+  return [
+    (px / w) * (2 * ALPHA_RANGE) - ALPHA_RANGE,
+    -((py / hC) * (2 * ALPHA_RANGE) - ALPHA_RANGE),
+  ];
+}
+function alphaToCanvas(z) {
+  const w = alphaCanvas.width, hC = alphaCanvas.height;
+  return [
+    ((z[0] + ALPHA_RANGE) / (2 * ALPHA_RANGE)) * w,
+    ((-z[1] + ALPHA_RANGE) / (2 * ALPHA_RANGE)) * hC,
+  ];
+}
+
+function drawAlphaPlane() {
+  aCtx.clearRect(0, 0, alphaCanvas.width, alphaCanvas.height);
+  aCtx.strokeStyle = '#e8e8eb';
+  aCtx.lineWidth = 1;
+  aCtx.beginPath();
+  const c = alphaToCanvas([0,0]);
+  aCtx.moveTo(0, c[1]); aCtx.lineTo(alphaCanvas.width, c[1]);
+  aCtx.moveTo(c[0], 0); aCtx.lineTo(c[0], alphaCanvas.height);
+  aCtx.stroke();
+
+  aCtx.fillStyle = '#D55E00';
+  aCtx.strokeStyle = '#1a1a1a';
+  aCtx.lineWidth = 1.4;
+  for (const b of BRANCH_POINTS) {
+    const [bx, by] = alphaToCanvas(b);
+    aCtx.beginPath();
+    aCtx.arc(bx, by, 7, 0, 2*Math.PI);
+    aCtx.fill(); aCtx.stroke();
+  }
+
+  const [tx, ty] = alphaToCanvas([0,0]);
+  aCtx.fillStyle = '#000000';
+  aCtx.beginPath();
+  aCtx.moveTo(tx, ty - 9); aCtx.lineTo(tx - 7, ty + 5); aCtx.lineTo(tx + 7, ty + 5);
+  aCtx.closePath(); aCtx.fill();
+
+  if (cAbs(currentAlpha) > 0.001) {
+    const [ax, ay] = alphaToCanvas(currentAlpha);
+    aCtx.fillStyle = '#0072B2';
+    aCtx.strokeStyle = '#1a1a1a';
+    aCtx.beginPath();
+    aCtx.arc(ax, ay, 5, 0, 2*Math.PI);
+    aCtx.fill(); aCtx.stroke();
+  }
+}
+
+function moveAlphaTo(target) {
+  currentRoots = stepRootsAdaptive(currentRoots, currentAlpha, target);
+  currentAlpha = target;
+}
+function resetAlpha() {
+  currentAlpha = [0, 0];
+  currentRoots = INITIAL_ROOTS.map(r => [...r]);
+}
+
+alphaCanvas.addEventListener('mousedown', (e) => {
+  isDragging = true; resetAlpha();
+  const rect = alphaCanvas.getBoundingClientRect();
+  moveAlphaTo(canvasToAlpha(e.clientX - rect.left, e.clientY - rect.top));
+});
+alphaCanvas.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const rect = alphaCanvas.getBoundingClientRect();
+  moveAlphaTo(canvasToAlpha(e.clientX - rect.left, e.clientY - rect.top));
+});
+alphaCanvas.addEventListener('mouseup',    () => { isDragging = false; });
+alphaCanvas.addEventListener('mouseleave', () => { isDragging = false; });
+
+// ====================================================================
+// Generación de la superficie (one-time)
+// ====================================================================
+function generateSurface() {
+  const GRID = 80;
+  const halfRange = 0.85;
+  const positions = new Float32Array(GRID * GRID * 5 * 3);
+  const colors    = new Float32Array(GRID * GRID * 5 * 3);
+  let idx = 0;
+
+  // Coloreo Okabe-Ito como RGB normalizado
+  const rgbFromHex = (hex) => [((hex >> 16) & 0xff) / 255,
+                               ((hex >>  8) & 0xff) / 255,
+                               ( hex        & 0xff) / 255];
+  const sheetColors = ROOT_COLORS_HEX.map(rgbFromHex);
+
+  for (let i = 0; i < GRID; i++) {
+    const a_re = -halfRange + (2 * halfRange) * i / (GRID - 1);
+    for (let j = 0; j < GRID; j++) {
+      const a_im = -halfRange + (2 * halfRange) * j / (GRID - 1);
+      const alpha = [a_re, a_im];
+      const roots = durandKerner(alpha, INITIAL_ROOTS);
+      for (let k = 0; k < 5; k++) {
+        const x = roots[k];
+        const height = h(x);
+        positions[idx*3 + 0] = a_re;
+        positions[idx*3 + 1] = height;
+        positions[idx*3 + 2] = a_im;
+        const sheet = sheetOf(x);
+        colors[idx*3 + 0] = sheetColors[sheet][0];
+        colors[idx*3 + 1] = sheetColors[sheet][1];
+        colors[idx*3 + 2] = sheetColors[sheet][2];
+        idx++;
+      }
+    }
+  }
+  return { positions, colors, count: idx };
+}
+
+// ====================================================================
+// Three.js setup
+// ====================================================================
+let renderer, scene, camera, controls, rootMeshes = [];
+
+function setupThreeJS(surfData) {
+  const container = document.getElementById('threejs');
+  const w = container.clientWidth, hh = container.clientHeight;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xffffff);
+
+  camera = new THREE.PerspectiveCamera(45, w / hh, 0.01, 100);
+  camera.position.set(1.6, 1.4, 1.6);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(w, hh);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  container.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0, 0);
+  controls.update();
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+  const dir = new THREE.DirectionalLight(0xffffff, 0.5);
+  dir.position.set(3, 5, 4);
+  scene.add(dir);
+
+  // Nube de puntos para la superficie
+  const surfGeom = new THREE.BufferGeometry();
+  surfGeom.setAttribute('position', new THREE.BufferAttribute(surfData.positions, 3));
+  surfGeom.setAttribute('color',    new THREE.BufferAttribute(surfData.colors, 3));
+  const surfMat = new THREE.PointsMaterial({
+    size: 0.018,
+    vertexColors: true,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.7,
+  });
+  scene.add(new THREE.Points(surfGeom, surfMat));
+
+  // 5 esferas para las raíces actuales
+  const sphereGeom = new THREE.SphereGeometry(0.045, 24, 24);
+  for (let i = 0; i < 5; i++) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: ROOT_COLORS_HEX[i],
+      roughness: 0.4, metalness: 0.1,
+    });
+    const mesh = new THREE.Mesh(sphereGeom, mat);
+    scene.add(mesh);
+    rootMeshes.push(mesh);
+  }
+
+  // Marcador del punto base α* = 0 en la base
+  const baseGeom = new THREE.ConeGeometry(0.05, 0.08, 4);
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+  const baseMesh = new THREE.Mesh(baseGeom, baseMat);
+  baseMesh.position.set(0, 0, 0);
+  baseMesh.rotation.x = Math.PI;  // apuntar hacia abajo desde el plano base
+  scene.add(baseMesh);
+
+  // Puntos de ramificación en el plano base
+  const bpGeom = new THREE.SphereGeometry(0.035, 16, 16);
+  const bpMat  = new THREE.MeshStandardMaterial({ color: 0xD55E00 });
+  for (const b of BRANCH_POINTS) {
+    const m = new THREE.Mesh(bpGeom, bpMat);
+    m.position.set(b[0], 0, b[1]);
+    scene.add(m);
+  }
+}
+
+function updateMarkers() {
+  for (let i = 0; i < 5; i++) {
+    const x = currentRoots[i];
+    rootMeshes[i].position.set(currentAlpha[0], h(x), currentAlpha[1]);
+  }
+}
+
+// ====================================================================
+// FPS counter
+// ====================================================================
+const fpsEl = document.getElementById('fps-value');
+const verEl = document.getElementById('veredicto');
+let fpsBuffer = [];
+let lastFrameTime = performance.now();
+
+function updateFPS() {
+  const now = performance.now();
+  const delta = now - lastFrameTime;
+  lastFrameTime = now;
+  if (delta <= 0) return;
+  const fps = 1000 / delta;
+  fpsBuffer.push(fps);
+  if (fpsBuffer.length > 30) fpsBuffer.shift();
+  const avg = fpsBuffer.reduce((a, b) => a + b, 0) / fpsBuffer.length;
+  fpsEl.textContent = avg.toFixed(0);
+  if (avg >= 50) {
+    fpsEl.style.color = '#009E73';
+    verEl.textContent = 'Opción B viable también con 3D: 60 fps sostenidos.';
+    verEl.style.background = '#e8f5e9'; verEl.style.color = '#1b5e20';
+  } else if (avg >= 30) {
+    fpsEl.style.color = '#E69F00';
+    verEl.textContent = 'Marginal con 3D: 30-50 fps. Considerar reducir densidad de la nube.';
+    verEl.style.background = '#fff3e0'; verEl.style.color = '#7c4a00';
+  } else {
+    fpsEl.style.color = '#D55E00';
+    verEl.textContent = 'Insuficiente con 3D: caer a malla LOD o cambiar shader.';
+    verEl.style.background = '#fdecea'; verEl.style.color = '#7a1700';
+  }
+}
+
+// ====================================================================
+// Render loop
+// ====================================================================
+function loop() {
+  updateFPS();
+  drawAlphaPlane();
+  updateMarkers();
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+
+// ====================================================================
+// Bootstrap: generar superficie de forma asíncrona para no bloquear
+// el render inicial
+// ====================================================================
+setTimeout(() => {
+  const surfData = generateSurface();
+  setupThreeJS(surfData);
+  document.getElementById('loading').style.display = 'none';
+  loop();
+}, 50);
+</script>
+
+</body>
+</html>
