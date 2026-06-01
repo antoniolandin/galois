@@ -12,15 +12,22 @@ function formatOrbitas(orbs: number[][]): string {
   return orbs.map((o) => '{' + o.join(', ') + '}').join('  ');
 }
 
-// El backend devuelve "S_5", "A_5", "D_4", "C_3"… con guión bajo.
-// Convertimos a subíndice Unicode (S₅, A₅, D₄) y reescribimos los
-// grupos cíclicos como ℤ_n (ℤ/nℤ, double-struck Z U+2124) en lugar
-// de C_n — convención preferida en este proyecto.
+// El backend, tras pasar por GAP, devuelve cadenas como
+// "S_5", "A_5", "D_4", "C_3", o compuestas: "C_2 x C_3", "C_5 : C_4".
+// Aquí:
+//   · C_n → ℤ_n (ℤ con doble barra, U+2124).
+//   · _N → subíndice Unicode (S₅, A₅, D₄, ℤ_n).
+//   · " x " → " × " (producto directo Unicode).
+//   · " : " → " ⋊ " (producto semidirecto Unicode).
 function formatEstructura(s: string): string {
-  const renamed = s.replace(/^C_/, 'ℤ_');
-  return renamed.replace(/_(\d+)/g, (_, digits: string) =>
+  let out = s.replace(/C_(\d+)/g, (_, digits: string) =>
+    'ℤ_' + digits,
+  );
+  out = out.replace(/_(\d+)/g, (_, digits: string) =>
     digits.split('').map((d) => SUB_DIGITS[parseInt(d, 10)]).join(''),
   );
+  out = out.replace(/ x /g, ' × ').replace(/ : /g, ' ⋊ ');
+  return out;
 }
 
 export function PanelGrupo({ subgrupo, generadores }: Props) {

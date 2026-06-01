@@ -123,6 +123,6 @@ def grupo(req: SubgrupoRequest) -> SubgrupoResponse:
     G = subgrupo_generado(generadores, req.grado)
     return SubgrupoResponse(
         orden=G.order(),
-        estructura=describir_grupo(G, req.grado),
+        estructura=describir_grupo(G, req.grado, generadores=generadores),
         orbitas=[sorted(o) for o in orbitas(G)],
     )

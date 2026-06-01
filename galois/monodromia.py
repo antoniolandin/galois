@@ -12,6 +12,7 @@ import numpy as np
 import sympy.combinatorics as comb
 
 from .continuacion import seguir_raiz
+from .identificacion import identificar_grupo_via_gap
 from .polinomio import Polinomio
 from .raices import raices_en
 
@@ -94,14 +95,30 @@ def orbitas(grupo: comb.PermutationGroup) -> list[set[int]]:
     return [set(o) for o in grupo.orbits()]
 
 
-def describir_grupo(grupo: comb.PermutationGroup, n: int) -> str:
-    """Identificacion abstracta rudimentaria del subgrupo: S_n, A_n,
-    ciclico, diedrico u 'orden N' como fallback.
+def describir_grupo(
+    grupo: comb.PermutationGroup,
+    n: int,
+    generadores: Sequence[comb.Permutation] | None = None,
+) -> str:
+    """Identificacion abstracta del subgrupo.
 
-    Sympy 1.14 no expone `is_alt` como propiedad publica; se detecta
-    A_n combinando orden = n!/2 con la condicion necesaria y suficiente
-    de que todos los generadores sean permutaciones pares (equivale a
-    G ⊆ A_n)."""
+    Estrategia: intentar primero GAP via subproceso (cubre la mayoria
+    de los grupos via `StructureDescription`). Si GAP no esta
+    disponible o falla, caer al identificador sympy basico.
+
+    `generadores` puede pasarse para evitar reconstruirlos desde
+    `grupo.generators` (que sympy puede haber reordenado o canonizado).
+    """
+    if generadores is None:
+        generadores = list(grupo.generators)
+    # Filtrar la identidad: GAP no la necesita y empeora la descripcion.
+    generadores_no_triv = [g for g in generadores if g.cyclic_form]
+
+    gap_info = identificar_grupo_via_gap(generadores_no_triv, n)
+    if gap_info is not None:
+        return gap_info["estructura"]
+
+    # Fallback sympy: cubre casos basicos cuando GAP no esta.
     orden = grupo.order()
     factorial_n = math.factorial(n)
 
@@ -109,11 +126,12 @@ def describir_grupo(grupo: comb.PermutationGroup, n: int) -> str:
         return "trivial"
     if orden == factorial_n and grupo.is_symmetric:
         return f"S_{n}"
-    if orden == factorial_n // 2 and all(g.is_even for g in grupo.generators):
+    if orden == factorial_n // 2 and all(
+        g.is_even for g in grupo.generators
+    ):
         return f"A_{n}"
     if grupo.is_cyclic:
         return f"C_{orden}"
-    # Diedrico: sympy no expone is_dihedral en todas las versiones.
     if hasattr(grupo, "is_dihedral"):
         try:
             if grupo.is_dihedral:
