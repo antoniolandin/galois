@@ -279,7 +279,11 @@ export default function App() {
             >
               Deshacer
             </button>
-            <button className="btn" onClick={handleReset}>
+            <button
+              className="btn"
+              onClick={handleReset}
+              disabled={generadores.length === 0}
+            >
               Reset
             </button>
           </div>
