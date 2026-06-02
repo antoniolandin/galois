@@ -24,11 +24,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Complex } from '../galois/complex';
 import { cAbs } from '../galois/complex';
 import {
-  BRANCH_X,
   DEGREE,
   INITIAL_ROOTS,
   ROOT_COLORS,
 } from '../galois/polinomio';
+import {
+  DEFAULT_CAM,
+  PHI_MAX,
+  PHI_MIN,
+  project,
+  type CamState,
+  type Vec3,
+} from '../galois/proyeccion3d';
 
 interface Props {
   ramificacion: Complex[];
@@ -40,26 +47,6 @@ interface Props {
   roots: Complex[];
 }
 
-type Vec3 = [number, number, number];
-
-interface CamState {
-  theta: number; // azimut (rad)
-  phi: number;   // elevation (rad)
-  d: number;     // distancia al origen
-}
-
-const DEFAULT_CAM: CamState = {
-  theta: -Math.PI / 4,
-  phi: Math.PI / 6,
-  d: 4.2,
-};
-
-// Clamp para evitar voltear el cubo al pasar por el polo.
-const PHI_MIN = (-89 * Math.PI) / 180;
-const PHI_MAX = (89 * Math.PI) / 180;
-
-const FOV = (50 * Math.PI) / 180;
-
 // Proyección de C → R que se usa para la coordenada vertical de las
 // trayectorias. Lineal en (Re, Im), con coeficiente ½ delante de Im
 // para evitar que raíces puramente imaginarias colapsen a la misma
@@ -70,65 +57,6 @@ const BRANCH_COLOR = '#D55E00';
 const GRID_COLOR = '#e4e4e6';
 const AXIS_COLOR = '#bfbfc2';
 const BOX_COLOR = '#d8d8db';
-
-// Proyecta un punto del mundo al plano del canvas. Devuelve también
-// la profundidad (positiva delante de la cámara) para descartar
-// puntos detrás del plano de cámara y, en su caso, ordenar por
-// profundidad.
-function project(
-  p: Vec3,
-  cam: CamState,
-  w: number,
-  h: number,
-): { sx: number; sy: number; depth: number } | null {
-  // Posición de la cámara en esféricas, mirando al origen.
-  const cosP = Math.cos(cam.phi);
-  const sinP = Math.sin(cam.phi);
-  const cosT = Math.cos(cam.theta);
-  const sinT = Math.sin(cam.theta);
-  const camPos: Vec3 = [
-    cam.d * cosP * Math.sin(cam.theta),
-    -cam.d * cosP * Math.cos(cam.theta),
-    cam.d * sinP,
-  ];
-  // Base de cámara: forward (hacia el origen), right, up.
-  const fx = -camPos[0] / cam.d;
-  const fy = -camPos[1] / cam.d;
-  const fz = -camPos[2] / cam.d;
-  // right = forward × worldUp,  worldUp = (0, 0, 1)
-  let rx = fy * 1 - fz * 0;
-  let ry = fz * 0 - fx * 1;
-  let rz = fx * 0 - fy * 0;
-  let rn = Math.hypot(rx, ry, rz);
-  if (rn < 1e-9) {
-    rx = 1;
-    ry = 0;
-    rz = 0;
-    rn = 1;
-  }
-  rx /= rn;
-  ry /= rn;
-  rz /= rn;
-  // up = right × forward
-  const ux = ry * fz - rz * fy;
-  const uy = rz * fx - rx * fz;
-  const uz = rx * fy - ry * fx;
-
-  const dx = p[0] - camPos[0];
-  const dy = p[1] - camPos[1];
-  const dz = p[2] - camPos[2];
-
-  const xCam = dx * rx + dy * ry + dz * rz;
-  const yCam = dx * ux + dy * uy + dz * uz;
-  const zCam = dx * fx + dy * fy + dz * fz; // profundidad hacia el frente
-
-  if (zCam <= 0.02) return null;
-
-  const f = Math.min(w, h) / 2 / Math.tan(FOV / 2);
-  const sx = (xCam / zCam) * f + w / 2;
-  const sy = -(yCam / zCam) * f + h / 2;
-  return { sx, sy, depth: zCam };
-}
 
 // Tamaños canónicos del mundo. El radio base se ajusta al polinomio
 // (igual que el plano α 2D), la altura se fija a 1.2 que cubre con
