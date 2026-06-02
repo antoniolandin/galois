@@ -24,7 +24,7 @@ interface Props {
 const SUB_DIGITS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
 
 function formatEstructura(s: string): string {
-  if (s === '1' || s === 'trivial') return '1';
+  if (s === '1' || s === 'trivial') return 'trivial';
   let out = s.replace(/C_(\d+)/g, (_, d) => 'ℤ_' + d);
   out = out.replace(/_(\d+)/g, (_, d: string) =>
     d.split('').map((c) => SUB_DIGITS[parseInt(c, 10)]).join(''),
@@ -132,6 +132,20 @@ export function LatticeView({ lattice }: Props) {
     w: 0,
     h: 0,
   });
+  // Contexto 2D oculto para medir el ancho real del texto del
+  // tooltip (incluye caracteres Unicode anchos como ℤ, ×, ⋊…). La
+  // heurística de "N · 6.6 px" producía cajas demasiado largas o
+  // cortas según los caracteres; `measureText` devuelve el ancho
+  // exacto que ocupará el SVG con la misma fuente.
+  const measureCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  if (measureCtxRef.current === null && typeof document !== 'undefined') {
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    if (ctx) {
+      ctx.font = '11px "Manrope", -apple-system, sans-serif';
+      measureCtxRef.current = ctx;
+    }
+  }
 
   useEffect(() => {
     const el = containerRef.current;
@@ -273,13 +287,26 @@ export function LatticeView({ lattice }: Props) {
               if (!p) return null;
               const x = p.x * scale + pan.x + 12;
               const y = p.y * scale + pan.y - 8;
-              const text = `${formatEstructura(hoveredNode.estructura)} (orden ${hoveredNode.orden})`;
+              // El trivial se muestra sólo como "trivial" (sin
+              // "orden 1" redundante) para que el tooltip no quede
+              // desproporcionadamente largo respecto al resto.
+              const esTrivial = hoveredNode.orden === 1;
+              const text = esTrivial
+                ? formatEstructura(hoveredNode.estructura)
+                : `${formatEstructura(hoveredNode.estructura)} (orden ${hoveredNode.orden})`;
+              // Ancho exacto del texto en pantalla: `measureText`
+              // contempla los caracteres Unicode anchos (ℤ, ×, ⋊…)
+              // así que la caja queda pegada al texto sin huecos.
+              const tw =
+                measureCtxRef.current?.measureText(text).width ??
+                text.length * 6.6;
+              const boxW = tw + 8;
               return (
                 <g style={{ pointerEvents: 'none' }}>
                   <rect
                     x={x - 4}
                     y={y - 14}
-                    width={text.length * 6.6 + 8}
+                    width={boxW}
                     height={20}
                     rx={3}
                     fill="rgba(255,255,255,0.95)"
