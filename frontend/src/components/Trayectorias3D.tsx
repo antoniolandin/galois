@@ -37,6 +37,7 @@ import {
   type Vec3,
 } from '../galois/proyeccion3d';
 import { altMaxPolinomio } from '../galois/superficie_riemann';
+import type { Dispatch, SetStateAction } from 'react';
 
 interface Props {
   ramificacion: Complex[];
@@ -46,6 +47,10 @@ interface Props {
   trayectorias: Complex[][];
   startRoots: Complex[];
   roots: Complex[];
+  // Cámara orbital compartida con la otra vista 3D, para que al
+  // alternar entre vistas se conserve el ángulo del usuario.
+  cam: CamState;
+  onCamChange: Dispatch<SetStateAction<CamState>>;
 }
 
 // Proyección de C → R que se usa para la coordenada vertical de las
@@ -94,10 +99,11 @@ export function Trayectorias3D({
   trayectorias,
   startRoots,
   roots,
+  cam,
+  onCamChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const [cam, setCam] = useState<CamState>(DEFAULT_CAM);
   const draggingRef = useRef<{ mx: number; my: number; cam: CamState } | null>(
     null,
   );
@@ -402,7 +408,7 @@ export function Trayectorias3D({
       let phi = d.cam.phi - dy * sens;
       if (phi < PHI_MIN) phi = PHI_MIN;
       if (phi > PHI_MAX) phi = PHI_MAX;
-      setCam({ theta: d.cam.theta + dx * sens, phi, d: d.cam.d });
+      onCamChange({ theta: d.cam.theta + dx * sens, phi, d: d.cam.d });
       return;
     }
     // Hit-test contra las raíces actuales. Igual que en PlanoX, radio
@@ -439,10 +445,10 @@ export function Trayectorias3D({
   function onWheel(e: React.WheelEvent<HTMLCanvasElement>) {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1 / 1.12 : 1.12;
-    setCam((c) => ({ ...c, d: Math.min(15, Math.max(1.5, c.d * factor)) }));
+    onCamChange((c) => ({ ...c, d: Math.min(15, Math.max(1.5, c.d * factor)) }));
   }
   function onDoubleClick() {
-    setCam(DEFAULT_CAM);
+    onCamChange(DEFAULT_CAM);
   }
 
   return (

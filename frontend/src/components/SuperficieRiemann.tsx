@@ -32,6 +32,7 @@ import {
   type Vec3,
 } from '../galois/proyeccion3d';
 import type { CameraMode } from './CameraToggle';
+import type { Dispatch, SetStateAction } from 'react';
 import {
   altMaxPolinomio,
   computarMallaRiemann,
@@ -47,6 +48,8 @@ interface Props {
   startRoots: Complex[];
   cameraMode: CameraMode;
   povIdx: number;
+  cam: CamState;
+  onCamChange: Dispatch<SetStateAction<CamState>>;
 }
 
 // Resolución de la malla (puntos por lado). 50 × 50 = 2 500 vértices
@@ -199,10 +202,11 @@ export function SuperficieRiemann({
   startRoots,
   cameraMode,
   povIdx,
+  cam,
+  onCamChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const [cam, setCam] = useState<CamState>(DEFAULT_CAM);
   // Orientación de la cámara en modo POV: yaw (azimut) y pitch
   // (elevación), expresados en radianes. `yaw = 0` mira hacia +Y;
   // `pitch = 0` mira horizontal. El roll queda implícito a 0 porque
@@ -802,7 +806,7 @@ export function SuperficieRiemann({
       let phi = d.cam.phi - dy * sens;
       if (phi < PHI_MIN) phi = PHI_MIN;
       if (phi > PHI_MAX) phi = PHI_MAX;
-      setCam({ theta: d.cam.theta + dx * sens, phi, d: d.cam.d });
+      onCamChange({ theta: d.cam.theta + dx * sens, phi, d: d.cam.d });
       return;
     }
     // Hit-test contra las raíces actuales, igual que en Trayectorias3D.
@@ -836,7 +840,7 @@ export function SuperficieRiemann({
     e.preventDefault();
     if (cameraMode === 'pov') return;
     const factor = e.deltaY < 0 ? 1 / 1.12 : 1.12;
-    setCam((c) => ({ ...c, d: Math.min(15, Math.max(1.5, c.d * factor)) }));
+    onCamChange((c) => ({ ...c, d: Math.min(15, Math.max(1.5, c.d * factor)) }));
   }
   function onDoubleClick() {
     if (cameraMode === 'pov') {
@@ -857,7 +861,7 @@ export function SuperficieRiemann({
       }
       return;
     }
-    setCam(DEFAULT_CAM);
+    onCamChange(DEFAULT_CAM);
   }
 
   return (

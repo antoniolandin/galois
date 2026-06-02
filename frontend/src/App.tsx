@@ -17,6 +17,7 @@ import { SuperficieRiemann } from './components/SuperficieRiemann';
 import { Trayectorias3D } from './components/Trayectorias3D';
 import { ViewToggle, type View } from './components/ViewToggle';
 import { CameraToggle, type CameraMode } from './components/CameraToggle';
+import { DEFAULT_CAM, type CamState } from './galois/proyeccion3d';
 
 // Un generador guardado lleva consigo todo el contexto visual que se
 // usó para descubrirlo: el trazo del plano α, las trayectorias de
@@ -36,6 +37,11 @@ export default function App() {
   const [mode, setMode] = useState<Mode>('manual');
   const [view, setView] = useState<View>('plano-x');
   const [cameraMode, setCameraMode] = useState<CameraMode>('orbital');
+  // Cámara orbital compartida entre las dos vistas 3D (Superficie
+  // de Riemann y Trayectorias). Levantarla a App hace que al
+  // cambiar de vista se conserve el ángulo y la distancia que el
+  // usuario haya estado ajustando.
+  const [orbitCam, setOrbitCam] = useState<CamState>(DEFAULT_CAM);
   // Índice de la raíz desde la que se mira en POV. De momento fija
   // a 0; cuando haya selector de raíz, este state se actualizará.
   const povIdx = 0;
@@ -339,6 +345,8 @@ export default function App() {
               trayectorias={displayTrayectorias}
               startRoots={displayStartRoots}
               roots={displayRoots}
+              cam={orbitCam}
+              onCamChange={setOrbitCam}
             />
           ) : (
             <SuperficieRiemann
@@ -350,6 +358,8 @@ export default function App() {
               startRoots={displayStartRoots}
               cameraMode={cameraMode}
               povIdx={povIdx}
+              cam={orbitCam}
+              onCamChange={setOrbitCam}
             />
           )}
         </div>
