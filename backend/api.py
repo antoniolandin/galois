@@ -13,6 +13,7 @@ import numpy as np
 import sympy.combinatorics as comb
 from fastapi import FastAPI, HTTPException
 
+from galois.galois_objetivo import calcular_grupo_galois
 from galois.identificacion import identificar_grupo_via_gap
 from galois.monodromia import (
     describir_grupo,
@@ -26,6 +27,7 @@ from galois.ramificacion import puntos_de_ramificacion
 
 from .modelos import (
     Complejo,
+    GrupoObjetivoResponse,
     LazoRequest,
     PermutacionResponse,
     PolinomioInfo,
@@ -42,6 +44,10 @@ P: Polinomio = x5_menos_x_mas_alpha()
 ALPHA_ESTRELLA: complex = 0 + 0j
 RAMIFICACION: np.ndarray = puntos_de_ramificacion(P)
 RAICES_BASE: np.ndarray = raices_en(P, ALPHA_ESTRELLA)
+# Grupo de Galois objetivo del polinomio actual sobre C(alpha). Se
+# precomputa una sola vez al arrancar la API; al cambiar de polinomio
+# habrá que recalcularlo igual que el resto del bloque.
+GRUPO_GALOIS: dict = calcular_grupo_galois(P, ALPHA_ESTRELLA, RAMIFICACION)
 
 
 app = FastAPI(
@@ -66,6 +72,19 @@ def polinomio_info() -> PolinomioInfo:
         alpha_estrella=Complejo.desde(ALPHA_ESTRELLA),
         puntos_de_ramificacion=[Complejo.desde(b) for b in RAMIFICACION],
         raices_base=[Complejo.desde(x) for x in RAICES_BASE],
+    )
+
+
+@app.get("/api/galois-objetivo", response_model=GrupoObjetivoResponse)
+def galois_objetivo() -> GrupoObjetivoResponse:
+    """Grupo de Galois objetivo del polinomio actual sobre C(alpha).
+    El resultado se precomputa al arrancar la API (ver `GRUPO_GALOIS`)
+    aplicando Hauenstein sin animar y delegando en GAP, así el
+    frontend puede comparar contra él en O(1) para saber si el
+    subgrupo descubierto ya cubre el grupo completo."""
+    return GrupoObjetivoResponse(
+        estructura=str(GRUPO_GALOIS.get("estructura", "?")),
+        orden=int(GRUPO_GALOIS.get("orden", 1)),
     )
 
 

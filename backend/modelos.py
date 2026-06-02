@@ -91,6 +91,15 @@ class Lattice(BaseModel):
     aristas: list[tuple[int, int]]  # (j, i): clase j es subgrupo maximal de i
 
 
+class GrupoObjetivoResponse(BaseModel):
+    """Identificación del grupo de Galois "objetivo" del polinomio
+    sobre C(α). Se calcula al cargar la página para que el frontend
+    sepa cuándo el subgrupo descubierto ya alcanza el grupo total."""
+
+    estructura: str
+    orden: int
+
+
 class SubgrupoResponse(BaseModel):
     orden: int
     estructura: str
