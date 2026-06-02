@@ -355,16 +355,29 @@ export default function App() {
   }, []);
   const handleRunAleatorio = useCallback(async () => {
     if (!polinomio || runningAleatorio) return;
-    // El criterio de parada lo evalúa el bucle en la primera
-    // iteración consultando al backend con la lista de generadores
-    // actual: si ya estamos en el objetivo, sale sin animar. Una
-    // guarda aquí basada en el state `subgrupo` quedaría stale
-    // justo después de borrar una permutación.
+    // Pre-chequeo: si ya estamos en el grupo de Galois objetivo,
+    // no hay nada que hacer. Lo verificamos contra el backend con
+    // la lista de generadores actual (leída del ref para que
+    // refleje borrados recientes). Hacerlo aquí, ANTES de tocar
+    // ningún state, evita el flash de "iteración 0" cuando ya
+    // está todo descubierto.
+    if (galoisObjetivo) {
+      const permsActuales = generadoresRef.current.map((g) => g.permutacion);
+      let ordenActual = 1;
+      if (permsActuales.length > 0) {
+        try {
+          const grupo = await getSubgrupo(permsActuales, polinomio.grado);
+          ordenActual = grupo.orden;
+        } catch (e) {
+          console.error('[aleatorio] error al consultar el grupo', e);
+          return;
+        }
+      }
+      if (ordenActual === galoisObjetivo.orden) return;
+    }
     stoppedAleatorioRef.current = false;
     setRunningAleatorio(true);
     setIterAleatorio(0);
-    // Deseleccionar cualquier generador previo: la animación pinta
-    // sobre el "live", no sobre un snapshot.
     setSelectedIdx(null);
 
     const alphaEstrellaLocal: Complex = [
@@ -526,10 +539,23 @@ export default function App() {
   }, []);
   const handleRunHauenstein = useCallback(async () => {
     if (!polinomio || runningHauenstein) return;
-    // Sin guarda inicial basada en `subgrupo`: si acabamos de
-    // borrar un generador, el state aún tiene el orden previo y
-    // bloquearía el rearranque. El bucle hace `getSubgrupo` en su
-    // primera iteración y para si ya estamos en el objetivo.
+    // Pre-chequeo idéntico al de aleatorio: si ya estamos en el
+    // grupo de Galois objetivo, salimos sin tocar state ni
+    // incrementar el contador de iteraciones.
+    if (galoisObjetivo) {
+      const permsActuales = generadoresRef.current.map((g) => g.permutacion);
+      let ordenActual = 1;
+      if (permsActuales.length > 0) {
+        try {
+          const grupo = await getSubgrupo(permsActuales, polinomio.grado);
+          ordenActual = grupo.orden;
+        } catch (e) {
+          console.error('[hauenstein] error al consultar el grupo', e);
+          return;
+        }
+      }
+      if (ordenActual === galoisObjetivo.orden) return;
+    }
     stoppedHauensteinRef.current = false;
     setRunningHauenstein(true);
     setIterHauenstein(0);
