@@ -5,9 +5,15 @@ import { emparejarPorProximidad } from './galois/monodromia';
 import {
   getPolinomio,
   getSubgrupo,
+  postPermutacion,
   type PolinomioInfo,
   type SubgrupoResponse,
 } from './api/client';
+import {
+  alphaEstrellaInsegura,
+  generarLazoAleatorio,
+} from './galois/lazos_aleatorios';
+import { generarLazoAlrededorDe } from './galois/lazos_hauenstein';
 import { Header } from './components/Header';
 import { ModeSelector, type Mode } from './components/ModeSelector';
 import { PlanoAlpha } from './components/PlanoAlpha';
@@ -46,6 +52,25 @@ export default function App() {
   // a 0; cuando haya selector de raíz, este state se actualizará.
   const povIdx = 0;
 
+  // Estado del modo "Aleatorio" (Leykin–Sottile). Cuando está en
+  // marcha, un bucle async genera lazos pseudoaleatorios alrededor
+  // de los puntos de ramificación, los manda al backend, acumula
+  // generadores y comprueba después de cada paso si el subgrupo
+  // descubierto ya es el simétrico completo (criterio de parada
+  // del paper). `runningAleatorio` controla la UI; `stoppedRef`
+  // permite cancelar el bucle desde el botón "Detener".
+  const [runningAleatorio, setRunningAleatorio] = useState(false);
+  const stoppedAleatorioRef = useRef(false);
+  // Iteración actual: solo informativo para la UI.
+  const [iterAleatorio, setIterAleatorio] = useState(0);
+
+  // Estado del modo Hauenstein–Rodríguez–Sottile. Recorre los
+  // puntos de ramificación uno a uno y solo anima el lazo cuando
+  // su permutación añade información al grupo descubierto.
+  const [runningHauenstein, setRunningHauenstein] = useState(false);
+  const stoppedHauensteinRef = useRef(false);
+  const [iterHauenstein, setIterHauenstein] = useState(0);
+
   const [currentAlpha, setCurrentAlpha] = useState<Complex>([0, 0]);
   const [currentRoots, setCurrentRoots] = useState<Complex[]>([...INITIAL_ROOTS]);
   const [startRoots, setStartRoots] = useState<Complex[]>([...INITIAL_ROOTS]);
@@ -72,6 +97,14 @@ export default function App() {
   useEffect(() => {
     trayectoriasRef.current = trayectorias;
   }, [trayectorias]);
+  // Mismo patrón para los generadores: los bucles del modo
+  // Aleatorio y Hauenstein leen las permutaciones acumuladas desde
+  // aquí en cada iteración, así reaccionan en vivo si el usuario
+  // borra un generador (el ✕ del panel) mientras corren.
+  const generadoresRef = useRef(generadores);
+  useEffect(() => {
+    generadoresRef.current = generadores;
+  }, [generadores]);
 
   // Cargar info del polinomio al montar
   useEffect(() => {
@@ -98,6 +131,33 @@ export default function App() {
     setTrayectorias(INITIAL_ROOTS.map(() => [] as Complex[]));
   }, []);
 
+  // Inserta un generador en la lista, descartando identidad y duplicados.
+  // Se usa tanto desde el flujo manual (vía `handleLoopEnd`) como desde
+  // el bucle del modo Aleatorio (`runAleatorio`).
+  //
+  // `autoSelect` controla si el nuevo generador queda seleccionado al
+  // insertarse. En el modo manual sí (el usuario suelta el lazo y la
+  // vista muestra el snapshot que acaba de generar); en el modo
+  // aleatorio no, para que el bucle siga animando los siguientes
+  // lazos en vivo sin que la UI se congele en el último snapshot.
+  const addGenerador = useCallback(
+    (gen: GeneradorGuardado, autoSelect = true) => {
+      const isIdentity = gen.permutacion.every((j, i) => j === i);
+      if (isIdentity) return;
+      setGeneradores((prev) => {
+        const isDup = prev.some(
+          (g) =>
+            g.permutacion.length === gen.permutacion.length &&
+            g.permutacion.every((x, i) => x === gen.permutacion[i]),
+        );
+        if (isDup) return prev;
+        if (autoSelect) setSelectedIdx(prev.length);
+        return [...prev, gen];
+      });
+    },
+    [],
+  );
+
   const handleLoopEnd = useCallback(
     (
       finalRoots: Complex[],
@@ -106,32 +166,16 @@ export default function App() {
       lazo: Complex[],
     ) => {
       const asignacion = emparejarPorProximidad(finalRoots, sRoots);
-      const isIdentity = asignacion.every((j, i) => j === i);
-      if (isIdentity) return;
-
-      const nuevoGen: GeneradorGuardado = {
+      addGenerador({
         permutacion: asignacion,
         lazo: [...lazo],
         trayectorias: trayectoriasRef.current.map((t) => [...t]),
         startAlpha: [...startAlpha] as Complex,
         startRoots: [...sRoots],
         endRoots: [...finalRoots],
-      };
-
-      setGeneradores((prev) => {
-        const isDup = prev.some(
-          (g) =>
-            g.permutacion.length === asignacion.length &&
-            g.permutacion.every((x, i) => x === asignacion[i]),
-        );
-        if (isDup) return prev;
-        // El nuevo generador queda automáticamente seleccionado para
-        // que su lazo siga visible tras cerrar.
-        setSelectedIdx(prev.length);
-        return [...prev, nuevoGen];
       });
     },
-    [],
+    [addGenerador],
   );
 
   const handleDeshacer = useCallback(() => {
@@ -150,6 +194,21 @@ export default function App() {
     setCurrentAlpha([0, 0]);
     setCurrentRoots([...INITIAL_ROOTS]);
     setStartRoots([...INITIAL_ROOTS]);
+    resetTrayectorias();
+    setResetKey((k) => k + 1);
+  }, [resetTrayectorias]);
+
+  // Reset "visual" sin tocar los generadores acumulados: limpia el
+  // estado vivo (raíces actuales, lazo en curso, trayectorias) y
+  // devuelve la cámara a α*. Lo usa la transición de modo para que
+  // las raíces vuelvan a sus posiciones iniciales sin perder los
+  // generadores que ya se habían descubierto.
+  const handleResetVisual = useCallback(() => {
+    setSelectedIdx(null);
+    setCurrentAlpha([0, 0]);
+    setCurrentRoots([...INITIAL_ROOTS]);
+    setStartRoots([...INITIAL_ROOTS]);
+    setLiveLazo([]);
     resetTrayectorias();
     setResetKey((k) => k + 1);
   }, [resetTrayectorias]);
@@ -206,9 +265,376 @@ export default function App() {
     setSelectedIdx((prev) => (prev == null ? prev : null));
   }, []);
 
-  // Atajos de teclado.
+  // Bucle del modo Aleatorio (Leykin–Sottile): genera lazos
+  // pseudoaleatorios alrededor de los puntos de ramificación, los
+  // manda al backend, acumula los generadores no identidad y comprueba
+  // tras cada paso si el subgrupo descubierto coincide con el
+  // simétrico completo S_n. Para cuando se cumple ese criterio o
+  // cuando el usuario pulsa "Detener".
+  const handleStopAleatorio = useCallback(() => {
+    stoppedAleatorioRef.current = true;
+  }, []);
+  const handleRunAleatorio = useCallback(async () => {
+    if (!polinomio || runningAleatorio) return;
+    stoppedAleatorioRef.current = false;
+    setRunningAleatorio(true);
+    setIterAleatorio(0);
+    // Deseleccionar cualquier generador previo: la animación pinta
+    // sobre el "live", no sobre un snapshot.
+    setSelectedIdx(null);
+
+    const alphaEstrellaLocal: Complex = [
+      polinomio.alpha_estrella.re,
+      polinomio.alpha_estrella.im,
+    ];
+    const ramif: Complex[] = polinomio.puntos_de_ramificacion.map(
+      (p) => [p.re, p.im] as Complex,
+    );
+    // `polinomio.raices_base` viene del backend en el orden de
+    // `np.roots` (autovalores de la matriz compañera), que NO
+    // coincide con el orden canónico de `INITIAL_ROOTS` ni con los
+    // colores. Calculamos la permutación que mapea cada raíz inicial
+    // a su contraparte del backend para reordenar las trayectorias
+    // y mantener "la raíz negra siempre en el origen".
+    const raicesBaseRaw: Complex[] = polinomio.raices_base.map(
+      (p) => [p.re, p.im] as Complex,
+    );
+    const permBackendACanonico = emparejarPorProximidad(
+      INITIAL_ROOTS,
+      raicesBaseRaw,
+    );
+    const raicesBase: Complex[] = [...INITIAL_ROOTS];
+    const n = polinomio.grado;
+    if (alphaEstrellaInsegura(alphaEstrellaLocal, ramif)) {
+      console.warn(
+        '[aleatorio] α* está peligrosamente cerca de un punto de ramificación; ' +
+          'considera usar otro punto base.',
+      );
+    }
+    // Las permutaciones acumuladas se releen del ref en cada
+    // iteración (ver bucle), así reflejan al instante los
+    // borrados que el usuario haga en el panel.
+
+    // Velocidad de animación: ms entre pasos del lazo. Más bajo =
+    // más rápido. 18 ms da ~55 fps, fluido a la vista.
+    const PASO_MS = 18;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    const MAX_ITER = 120;
+    for (let iter = 0; iter < MAX_ITER; iter++) {
+      if (stoppedAleatorioRef.current) break;
+      // Las permutaciones se releen del ref, así reflejan los
+      // borrados que el usuario haga en el panel mientras corre.
+      const perms = generadoresRef.current.map((g) => g.permutacion);
+      // Criterio de parada: subgrupo == S_n. La comprobación pasa
+      // por GAP en el backend; sólo se hace si ya hay generadores.
+      if (perms.length > 0) {
+        try {
+          const grupo = await getSubgrupo(perms, n);
+          if (stoppedAleatorioRef.current) break;
+          if (grupo.estructura === `S_${n}`) break;
+        } catch (e) {
+          console.error('[aleatorio] error al consultar el grupo', e);
+          break;
+        }
+      }
+      setIterAleatorio(iter + 1);
+      const lazo = generarLazoAleatorio(alphaEstrellaLocal, ramif);
+      try {
+        const lazoJson = lazo.map(([re, im]) => ({ re, im }));
+        // El lazo ya empieza y termina en α*; le decimos al backend
+        // que NO añada α* por su cuenta para que las trayectorias
+        // devueltas tengan exactamente la longitud del lazo.
+        const resp = await postPermutacion(lazoJson, false);
+        if (stoppedAleatorioRef.current) break;
+        const trayectoriasRaw = resp.trayectorias.map((t) =>
+          t.map((c) => [c.re, c.im] as Complex),
+        );
+        // Reordenar al orden canónico para que la raíz índice 0
+        // sea la del origen, índice 1 la de x=1, etc.
+        const trayectoriasCompl: Complex[][] = permBackendACanonico.map(
+          (j) => trayectoriasRaw[j],
+        );
+        const finalRoots: Complex[] = trayectoriasCompl.map(
+          (t) => t[t.length - 1],
+        );
+        // La asignación del backend también va en orden np.roots;
+        // recálculo en el orden canónico por emparejamiento final.
+        const asignacionCanonica = emparejarPorProximidad(
+          finalRoots,
+          INITIAL_ROOTS,
+        );
+
+        // --- Animación paso a paso del lazo y de las raíces ---
+        setStartRoots(raicesBase);
+        setCurrentAlpha(lazo[0]);
+        setCurrentRoots(raicesBase);
+        resetTrayectorias();
+        setLiveLazo([lazo[0]]);
+        for (let i = 1; i < lazo.length; i++) {
+          if (stoppedAleatorioRef.current) break;
+          const rootsEnPaso: Complex[] = trayectoriasCompl.map(
+            (t) => t[i],
+          );
+          setCurrentAlpha(lazo[i]);
+          setCurrentRoots(rootsEnPaso);
+          pushTrayectoria(rootsEnPaso);
+          setLiveLazo(lazo.slice(0, i + 1));
+          await sleep(PASO_MS);
+        }
+        if (stoppedAleatorioRef.current) break;
+
+        addGenerador(
+          {
+            permutacion: asignacionCanonica,
+            lazo: [...lazo],
+            trayectorias: trayectoriasCompl,
+            startAlpha: [...alphaEstrellaLocal] as Complex,
+            startRoots: raicesBase,
+            endRoots: finalRoots,
+          },
+          false,
+        );
+        // `perms` se reconstruye desde el ref al inicio de la
+        // siguiente iteración; no hace falta apenderlo aquí.
+      } catch (e) {
+        console.error('[aleatorio] error al calcular permutación', e);
+        break;
+      }
+      // Pausa entre lazos para que el espectador "vea" el paso.
+      await sleep(200);
+      // Limpiar la visualización antes del siguiente lazo: vuelve
+      // todo al estado base (sin lazo, raíces en α*).
+      setLiveLazo([]);
+      resetTrayectorias();
+      setCurrentAlpha(alphaEstrellaLocal);
+      setCurrentRoots(raicesBase);
+      setStartRoots(raicesBase);
+    }
+    setRunningAleatorio(false);
+  }, [
+    polinomio,
+    runningAleatorio,
+    generadores,
+    addGenerador,
+    pushTrayectoria,
+    resetTrayectorias,
+  ]);
+
+  // Bucle del modo Hauenstein–Rodríguez–Sottile: recorre cada
+  // punto de ramificación, calcula el lazo que lo rodea y la
+  // permutación que induce, y SOLO anima el dibujo (y guarda el
+  // generador) si esa permutación añade información al subgrupo
+  // ya descubierto. El criterio de parada es doble: o se llega a
+  // S_n (siempre que el grupo sea simétrico) o se han recorrido
+  // todos los puntos de ramificación.
+  const handleStopHauenstein = useCallback(() => {
+    stoppedHauensteinRef.current = true;
+  }, []);
+  const handleRunHauenstein = useCallback(async () => {
+    if (!polinomio || runningHauenstein) return;
+    stoppedHauensteinRef.current = false;
+    setRunningHauenstein(true);
+    setIterHauenstein(0);
+    setSelectedIdx(null);
+
+    const alphaEstrellaLocal: Complex = [
+      polinomio.alpha_estrella.re,
+      polinomio.alpha_estrella.im,
+    ];
+    const ramif: Complex[] = polinomio.puntos_de_ramificacion.map(
+      (p) => [p.re, p.im] as Complex,
+    );
+    const raicesBaseRaw: Complex[] = polinomio.raices_base.map(
+      (p) => [p.re, p.im] as Complex,
+    );
+    const permBackendACanonico = emparejarPorProximidad(
+      INITIAL_ROOTS,
+      raicesBaseRaw,
+    );
+    const raicesBase: Complex[] = [...INITIAL_ROOTS];
+    const n = polinomio.grado;
+
+    // Trayectorias más lentas que en Aleatorio para dar tiempo a
+    // ver cada rodeo con detalle.
+    const PASO_MS = 40;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    // Bucle de rondas. Cada ronda recorre los puntos de ramificación;
+    // si en una ronda no se añadió nada nuevo, se sale. Si el
+    // usuario borra un generador descubierto, su permutación volverá
+    // a faltar y se reanima en la siguiente ronda.
+    const MAX_RONDAS = 4;
+    let totalIter = 0;
+    rondas: for (let ronda = 0; ronda < MAX_RONDAS; ronda++) {
+      if (stoppedHauensteinRef.current) break;
+      let anadidoEnRonda = false;
+      for (let idx = 0; idx < ramif.length; idx++) {
+        if (stoppedHauensteinRef.current) break rondas;
+        totalIter += 1;
+        setIterHauenstein(totalIter);
+        // Releer las permutaciones acumuladas desde el ref: refleja
+        // los borrados que el usuario haya hecho en el panel.
+        const perms = generadoresRef.current.map((g) => g.permutacion);
+        let ordenPrevio = 1;
+        if (perms.length > 0) {
+          try {
+            const g0 = await getSubgrupo(perms, n);
+            if (stoppedHauensteinRef.current) break rondas;
+            if (g0.estructura === `S_${n}`) break rondas;
+            ordenPrevio = g0.orden;
+          } catch (e) {
+            console.error('[hauenstein] error al consultar el grupo', e);
+            break rondas;
+          }
+        }
+        const bi = ramif[idx];
+        const otrosB = ramif.filter((_, j) => j !== idx);
+        const lazo = generarLazoAlrededorDe(alphaEstrellaLocal, bi, otrosB);
+        try {
+          const lazoJson = lazo.map(([re, im]) => ({ re, im }));
+          const resp = await postPermutacion(lazoJson, false);
+          if (stoppedHauensteinRef.current) break rondas;
+          const trayectoriasRaw = resp.trayectorias.map((t) =>
+            t.map((c) => [c.re, c.im] as Complex),
+          );
+          const trayectoriasCompl: Complex[][] = permBackendACanonico.map(
+            (j) => trayectoriasRaw[j],
+          );
+          const finalRoots: Complex[] = trayectoriasCompl.map(
+            (t) => t[t.length - 1],
+          );
+          const sigma = emparejarPorProximidad(finalRoots, INITIAL_ROOTS);
+          const isIdentity = sigma.every((j, i) => j === i);
+          if (isIdentity) continue;
+
+          // ¿Esta permutación aporta información al grupo actual?
+          const candidata = [...perms, sigma];
+          const grupoCandidato = await getSubgrupo(candidata, n);
+          if (stoppedHauensteinRef.current) break rondas;
+          if (grupoCandidato.orden === ordenPrevio) {
+            // Ya cubierta: saltamos el rodeo sin animar.
+            continue;
+          }
+
+          // Aporta: animar la trayectoria paso a paso.
+          setStartRoots(raicesBase);
+          setCurrentAlpha(lazo[0]);
+          setCurrentRoots(raicesBase);
+          resetTrayectorias();
+          setLiveLazo([lazo[0]]);
+          for (let i = 1; i < lazo.length; i++) {
+            if (stoppedHauensteinRef.current) break rondas;
+            const rootsEnPaso: Complex[] = trayectoriasCompl.map((t) => t[i]);
+            setCurrentAlpha(lazo[i]);
+            setCurrentRoots(rootsEnPaso);
+            pushTrayectoria(rootsEnPaso);
+            setLiveLazo(lazo.slice(0, i + 1));
+            await sleep(PASO_MS);
+          }
+          if (stoppedHauensteinRef.current) break rondas;
+
+          addGenerador(
+            {
+              permutacion: sigma,
+              lazo: [...lazo],
+              trayectorias: trayectoriasCompl,
+              startAlpha: [...alphaEstrellaLocal] as Complex,
+              startRoots: raicesBase,
+              endRoots: finalRoots,
+            },
+            false,
+          );
+          anadidoEnRonda = true;
+          if (grupoCandidato.estructura === `S_${n}`) break rondas;
+        } catch (e) {
+          console.error('[hauenstein] error al calcular permutación', e);
+          break rondas;
+        }
+        await sleep(250);
+        setLiveLazo([]);
+        resetTrayectorias();
+        setCurrentAlpha(alphaEstrellaLocal);
+        setCurrentRoots(raicesBase);
+        setStartRoots(raicesBase);
+      }
+      if (!anadidoEnRonda) break;
+    }
+    // Limpieza final del estado vivo.
+    setLiveLazo([]);
+    resetTrayectorias();
+    setCurrentAlpha(alphaEstrellaLocal);
+    setCurrentRoots(raicesBase);
+    setStartRoots(raicesBase);
+    setRunningHauenstein(false);
+  }, [
+    polinomio,
+    runningHauenstein,
+    generadores,
+    addGenerador,
+    pushTrayectoria,
+    resetTrayectorias,
+  ]);
+
+  // Re-arranque automático cuando el usuario borra un generador
+  // mientras está en modo aleatorio o Hauenstein. Si el bucle ya
+  // había terminado (p.ej. porque alcanzó S_n) y el borrado deja
+  // un agujero, retomamos el algoritmo para rellenarlo.
+  const prevGenLenRef = useRef(generadores.length);
+  useEffect(() => {
+    const prev = prevGenLenRef.current;
+    prevGenLenRef.current = generadores.length;
+    if (generadores.length >= prev) return;
+    if (mode === 'hauenstein' && !runningHauenstein) {
+      handleRunHauenstein();
+    } else if (mode === 'aleatorio' && !runningAleatorio) {
+      handleRunAleatorio();
+    }
+  }, [
+    generadores.length,
+    mode,
+    runningHauenstein,
+    runningAleatorio,
+    handleRunHauenstein,
+    handleRunAleatorio,
+  ]);
+
+  // Transición entre modos. El cambio de modo limpia sólo el
+  // estado vivo (raíces actuales, lazo en curso, trayectorias) para
+  // que las raíces vuelvan a su posición inicial, PERO los
+  // generadores acumulados se mantienen — son parte del progreso
+  // que el usuario ya consiguió. Si el nuevo modo es "aleatorio",
+  // el bucle arranca con esas permutaciones ya en la lista, así
+  // sigue desde donde estaban.
+  const prevModeRef = useRef<Mode>(mode);
+  useEffect(() => {
+    if (prevModeRef.current === mode) return;
+    const prevMode = prevModeRef.current;
+    prevModeRef.current = mode;
+    if (prevMode === 'aleatorio') handleStopAleatorio();
+    if (prevMode === 'hauenstein') handleStopHauenstein();
+    handleResetVisual();
+    if (mode === 'aleatorio') {
+      setTimeout(() => handleRunAleatorio(), 0);
+    } else if (mode === 'hauenstein') {
+      setTimeout(() => handleRunHauenstein(), 0);
+    }
+  }, [
+    mode,
+    handleRunAleatorio,
+    handleStopAleatorio,
+    handleRunHauenstein,
+    handleStopHauenstein,
+    handleResetVisual,
+  ]);
+
+  // Atajos de teclado. Sólo activos en modo Manual: en Aleatorio y
+  // Hauenstein el plano α lo pilota un bucle automático y un
+  // Ctrl+Z o un Escape lo dejarían incoherente con el state del
+  // bucle.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      if (mode !== 'manual') return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
@@ -224,7 +650,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleDeshacer, handleEscape, generadores.length]);
+  }, [mode, handleDeshacer, handleEscape, generadores.length]);
 
   if (!polinomio) {
     return (
@@ -295,23 +721,72 @@ export default function App() {
             onLoopEnd={handleLoopEnd}
             onInteraction={handleCanvasInteraction}
             onLazoChange={setLiveLazo}
+            disabled={mode !== 'manual'}
           />
 
           <div className="controls">
-            <button
-              className="btn"
-              onClick={handleDeshacer}
-              disabled={generadores.length === 0}
-            >
-              Deshacer
-            </button>
-            <button
-              className="btn"
-              onClick={handleReset}
-              disabled={generadores.length === 0}
-            >
-              Reset
-            </button>
+            {mode === 'aleatorio' ? (
+              <>
+                <button
+                  className="btn"
+                  onClick={
+                    runningAleatorio ? handleStopAleatorio : handleRunAleatorio
+                  }
+                >
+                  {runningAleatorio
+                    ? `Detener (iter ${iterAleatorio})`
+                    : 'Continuar'}
+                </button>
+                <button
+                  className="btn"
+                  onClick={handleReset}
+                  disabled={runningAleatorio || generadores.length === 0}
+                >
+                  Reset
+                </button>
+              </>
+            ) : mode === 'hauenstein' ? (
+              <>
+                <button
+                  className="btn"
+                  onClick={
+                    runningHauenstein
+                      ? handleStopHauenstein
+                      : handleRunHauenstein
+                  }
+                >
+                  {runningHauenstein
+                    ? `Detener (B ${iterHauenstein}/${
+                        polinomio.puntos_de_ramificacion.length
+                      })`
+                    : 'Continuar'}
+                </button>
+                <button
+                  className="btn"
+                  onClick={handleReset}
+                  disabled={runningHauenstein || generadores.length === 0}
+                >
+                  Reset
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="btn"
+                  onClick={handleDeshacer}
+                  disabled={generadores.length === 0}
+                >
+                  Deshacer
+                </button>
+                <button
+                  className="btn"
+                  onClick={handleReset}
+                  disabled={generadores.length === 0}
+                >
+                  Reset
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -319,17 +794,14 @@ export default function App() {
         <div className="panel col-viewport">
           <div className="viewport-overlay">
             <ViewToggle view={view} onChange={setView} />
-            {view === 'superficie' && (
-              <>
-                <div style={{ flex: 1 }} />
-                <CameraToggle
-                  mode={cameraMode}
-                  povIdx={povIdx}
-                  onChange={setCameraMode}
-                />
-              </>
-            )}
           </div>
+          {view === 'superficie' && (
+            <CameraToggle
+              mode={cameraMode}
+              povIdx={povIdx}
+              onChange={setCameraMode}
+            />
+          )}
           {view === 'plano-x' ? (
             <PlanoX
               roots={displayRoots}

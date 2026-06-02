@@ -205,6 +205,59 @@ body {
   display: block;
 }
 
+/* Toggle circular de la cámara (orbital ⇄ primera persona).
+   Vive en posición absoluta dentro del viewport para superponerse
+   al canvas 3D. Los dos iconos se apilan y hacen cross-fade con
+   ligero scale al alternar el modo, estilo "play/pause" de YouTube. */
+.camera-toggle-btn {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #d8d8d8;
+  color: #1a1a1a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+  transition: background 0.15s, border-color 0.15s, color 0.15s,
+    transform 0.15s;
+  padding: 0;
+}
+.camera-toggle-btn:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+.camera-toggle-btn.is-pov {
+  color: #fff;
+}
+.camera-toggle-btn svg {
+  position: absolute;
+  display: block;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.camera-toggle-btn .ico-cam {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+.camera-toggle-btn .ico-eye {
+  opacity: 0;
+  transform: scale(0.55) rotate(-30deg);
+}
+.camera-toggle-btn.is-pov .ico-cam {
+  opacity: 0;
+  transform: scale(0.55) rotate(30deg);
+}
+.camera-toggle-btn.is-pov .ico-eye {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
 /* Placeholder para las vistas 3D aún no implementadas */
 .viewport-placeholder {
   text-align: center;

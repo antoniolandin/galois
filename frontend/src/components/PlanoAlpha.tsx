@@ -46,6 +46,10 @@ interface Props {
   // Espejo del lazo interno hacia el padre, para que la vista 3D
   // pueda leerlo en vivo. Se dispara en cada cambio del array.
   onLazoChange?: (lazo: Complex[]) => void;
+  // Si true, el canvas queda en modo "solo lectura": no responde
+  // a mousedown/move/up. Lo usan los modos Aleatorio y Hauenstein,
+  // que pilotan el plano α desde un bucle automático.
+  disabled?: boolean;
 }
 
 // Tolerancia para considerar que α ha vuelto al punto de inicio del lazo.
@@ -65,6 +69,7 @@ export function PlanoAlpha({
   onLoopEnd,
   onInteraction,
   onLazoChange,
+  disabled = false,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDraggingRef = useRef(false);
@@ -229,6 +234,7 @@ export function PlanoAlpha({
   }
 
   function onMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (disabled) return;
     const target = getMouseAlpha(e);
     if (!target) return;
     // Cualquier interacción del usuario deselecciona el generador
@@ -247,6 +253,7 @@ export function PlanoAlpha({
   }
 
   function onMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (disabled) return;
     // Si estamos mostrando un lazo guardado, el hover está congelado.
     // Sólo un mousedown (que limpia la selección) reactiva el tracking.
     if (displayLazo != null && !isDraggingRef.current) return;

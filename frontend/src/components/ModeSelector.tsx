@@ -17,14 +17,12 @@ export function ModeSelector({ mode, onChange }: Props) {
       <button
         className={`mode ${mode === 'aleatorio' ? 'active' : ''}`}
         onClick={() => onChange('aleatorio')}
-        disabled
       >
         Aleatorio
       </button>
       <button
         className={`mode ${mode === 'hauenstein' ? 'active' : ''}`}
         onClick={() => onChange('hauenstein')}
-        disabled
       >
         Hauenstein
       </button>

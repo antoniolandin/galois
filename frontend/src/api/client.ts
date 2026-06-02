@@ -64,3 +64,25 @@ export async function getSubgrupo(
   if (!r.ok) throw new Error(`POST /api/grupo: ${r.status}`);
   return r.json();
 }
+
+export interface PermutacionResponse {
+  asignacion: number[];
+  cycles: number[][];
+  trayectorias: ComplejoJSON[][];
+}
+
+export async function postPermutacion(
+  lazo: ComplejoJSON[],
+  cerrarEnAlphaEstrella: boolean,
+): Promise<PermutacionResponse> {
+  const r = await fetch('/api/permutacion', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      lazo,
+      cerrar_en_alpha_estrella: cerrarEnAlphaEstrella,
+    }),
+  });
+  if (!r.ok) throw new Error(`POST /api/permutacion: ${r.status}`);
+  return r.json();
+}
