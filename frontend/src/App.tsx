@@ -237,7 +237,11 @@ export default function App() {
     setStartRoots([...INITIAL_ROOTS]);
     setLiveLazo([]);
     resetTrayectorias();
-    setResetKey((k) => k + 1);
+    // Aviso al canvas para que limpie su lazo interno sin pasar
+    // por un remount completo (evita el "blink" al cambiar de
+    // modo). El Reset duro de generadores sí remontea con
+    // `resetKey` en handleReset.
+    setClearLazoSignal((s) => s + 1);
   }, [resetTrayectorias]);
 
   const handleEscape = useCallback(() => {
