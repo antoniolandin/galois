@@ -66,6 +66,124 @@ const N_MALLA = 50;
 // misma altura al mismo valor de x.
 const altura = (x: Complex): number => x[0] + 0.5 * x[1];
 
+// Frame local (right, forwardDef) ortogonal a `up`. `forwardDef` se
+// elige proyectando el vector mundo (0, 1, 0) sobre el plano
+// perpendicular a `up`; si esa proyección es nula (caso degenerado
+// con up paralelo a +Y) cae a (1, 0, 0). `right = up × forwardDef`.
+function frameLocal(up: Vec3): { right: Vec3; forwardDef: Vec3 } {
+  const candidatos: Vec3[] = [
+    [0, 1, 0],
+    [1, 0, 0],
+  ];
+  let fx = 0;
+  let fy = 0;
+  let fz = 0;
+  for (const c of candidatos) {
+    const dot = c[0] * up[0] + c[1] * up[1] + c[2] * up[2];
+    const px = c[0] - dot * up[0];
+    const py = c[1] - dot * up[1];
+    const pz = c[2] - dot * up[2];
+    const pn = Math.hypot(px, py, pz);
+    if (pn > 1e-6) {
+      fx = px / pn;
+      fy = py / pn;
+      fz = pz / pn;
+      break;
+    }
+  }
+  // right = forwardDef × up (regla de la mano derecha).
+  const rx = fy * up[2] - fz * up[1];
+  const ry = fz * up[0] - fx * up[2];
+  const rz = fx * up[1] - fy * up[0];
+  return { right: [rx, ry, rz], forwardDef: [fx, fy, fz] };
+}
+
+// Dirección de mirada parametrizada por (yaw, pitch) en el frame
+// local: yaw = 0 mira en `forwardDef`, yaw positivo rota hacia el
+// `right` (CCW desde arriba); pitch positivo levanta la mirada
+// hacia `up`.
+function forwardDesdeYawPitch(
+  yaw: number,
+  pitch: number,
+  up: Vec3,
+): Vec3 {
+  const { right, forwardDef } = frameLocal(up);
+  const cy = Math.cos(yaw);
+  const sy = Math.sin(yaw);
+  const cp = Math.cos(pitch);
+  const sp = Math.sin(pitch);
+  const hx = cy * forwardDef[0] + sy * right[0];
+  const hy = cy * forwardDef[1] + sy * right[1];
+  const hz = cy * forwardDef[2] + sy * right[2];
+  return [
+    cp * hx + sp * up[0],
+    cp * hy + sp * up[1],
+    cp * hz + sp * up[2],
+  ];
+}
+
+// Inverso: (yaw, pitch) que orientan la cámara desde `camPos`
+// para mirar a `target`, expresados en el frame local de `up`.
+function yawPitchHaciaPunto(
+  target: Vec3,
+  camPos: Vec3,
+  up: Vec3,
+): { yaw: number; pitch: number } {
+  const { right, forwardDef } = frameLocal(up);
+  let wx = target[0] - camPos[0];
+  let wy = target[1] - camPos[1];
+  let wz = target[2] - camPos[2];
+  const wn = Math.hypot(wx, wy, wz);
+  if (wn < 1e-9) return { yaw: 0, pitch: 0 };
+  wx /= wn;
+  wy /= wn;
+  wz /= wn;
+  const wDotUp = wx * up[0] + wy * up[1] + wz * up[2];
+  const wDotFwd = wx * forwardDef[0] + wy * forwardDef[1] + wz * forwardDef[2];
+  const wDotRight = wx * right[0] + wy * right[1] + wz * right[2];
+  return {
+    pitch: Math.asin(Math.max(-1, Math.min(1, wDotUp))),
+    yaw: Math.atan2(wDotRight, wDotFwd),
+  };
+}
+
+// Normal local a la hoja `povIdx` en el punto del α actual.
+// La superficie es z = h(α), así que la normal (no unitaria) es
+// (-∂h/∂αx, -∂h/∂αy, 1).  Se aproxima con diferencias finitas
+// sobre la malla precomputada: dos vecinos en cada eje. Sirve
+// para que en POV el "up" de la cámara siga la inclinación de la
+// hoja sobre la que la raíz observada "camina".
+function normalEnAlpha(
+  malla: MallaRiemann,
+  currentAlpha: Complex,
+  povIdx: number,
+): Vec3 {
+  const N = malla.N;
+  const baseR = malla.baseR;
+  let i = Math.round(((currentAlpha[0] + baseR) / (2 * baseR)) * (N - 1));
+  let j = Math.round(((currentAlpha[1] + baseR) / (2 * baseR)) * (N - 1));
+  if (i < 1) i = 1;
+  else if (i >= N - 1) i = N - 2;
+  if (j < 1) j = 1;
+  else if (j >= N - 1) j = N - 2;
+  const dAlpha = (2 * baseR) / (N - 1);
+  const hAt = (ii: number, jj: number): number => {
+    const r = malla.roots[ii * N + jj][povIdx];
+    return r ? r[0] + 0.5 * r[1] : 0;
+  };
+  const dhdx = (hAt(i + 1, j) - hAt(i - 1, j)) / (2 * dAlpha);
+  const dhdy = (hAt(i, j + 1) - hAt(i, j - 1)) / (2 * dAlpha);
+  let nx = -dhdx;
+  let ny = -dhdy;
+  let nz = 1;
+  const nn = Math.hypot(nx, ny, nz);
+  if (nn < 1e-9) return [0, 0, 1];
+  nx /= nn;
+  ny /= nn;
+  nz /= nn;
+  return [nx, ny, nz];
+}
+
 const BOX_COLOR = '#d8d8db';
 
 // Tamaño en píxeles de cada punto de la nube. Se mantiene constante
@@ -258,19 +376,13 @@ export function SuperficieRiemann({
     if (cameraMode !== 'pov') return;
     if (draggingRef.current?.kind === 'pov') return;
     const cz = camZPOV(malla, currentAlpha, povIdx);
-    const fx = -currentAlpha[0];
-    const fy = -currentAlpha[1];
-    const fz = -cz;
-    const d = Math.hypot(fx, fy, fz);
-    if (d > 1e-6) {
-      const fzn = fz / d;
-      const cl = Math.max(-1, Math.min(1, fzn));
-      setPovPitch(Math.asin(cl));
-      setPovYaw(Math.atan2(fx / d, fy / d));
-    } else {
-      setPovYaw(0);
-      setPovPitch(0);
-    }
+    const camPos: Vec3 = [currentAlpha[0], currentAlpha[1], cz];
+    // yaw/pitch ahora viven en el frame local de la normal de la
+    // hoja; los resolvemos a partir del vector camPos → origen.
+    const up = normalEnAlpha(malla, currentAlpha, povIdx);
+    const { yaw, pitch } = yawPitchHaciaPunto([0, 0, 0], camPos, up);
+    setPovYaw(yaw);
+    setPovPitch(pitch);
   }, [currentAlpha, cameraMode, malla, povIdx]);
 
   useEffect(() => {
@@ -314,23 +426,22 @@ export function SuperficieRiemann({
         currentAlpha[1],
         camZPOV(malla, currentAlpha, povIdx),
       ];
-      // Forward desde (yaw, pitch). `target = camPos + forward`
-      // garantiza que la `projectFromLookAt` reciba un punto a
-      // distancia unidad en la dirección de mirada, equivalente al
-      // forward normalizado.
-      const cp = Math.cos(povPitch);
-      const sp = Math.sin(povPitch);
-      const cyaw = Math.cos(povYaw);
-      const syaw = Math.sin(povYaw);
-      const fx = cp * syaw;
-      const fy = cp * cyaw;
-      const fz = sp;
+      // `worldUp` = normal local de la hoja observada. La cámara
+      // se "inclina" con la superficie: cuando la hoja sube en una
+      // dirección, el techo de la cámara apunta hacia esa dirección.
+      const upLocal = normalEnAlpha(malla, currentAlpha, povIdx);
+      // El forward se construye en el frame local de `upLocal` para
+      // que el drag (yaw/pitch) se sienta como rotar la cabeza
+      // sobre la hoja: yaw siempre rota alrededor de la normal y
+      // pitch siempre levanta/baja la mirada relativa a la hoja.
+      const f = forwardDesdeYawPitch(povYaw, povPitch, upLocal);
       const target: Vec3 = [
-        camPos[0] + fx,
-        camPos[1] + fy,
-        camPos[2] + fz,
+        camPos[0] + f[0],
+        camPos[1] + f[1],
+        camPos[2] + f[2],
       ];
-      proj = (p: Vec3) => projectFromLookAt(p, camPos, target, w, h);
+      proj = (p: Vec3) =>
+        projectFromLookAt(p, camPos, target, w, h, upLocal);
     } else {
       proj = (p: Vec3) => project(p, cam, w, h);
     }
@@ -419,12 +530,15 @@ export function SuperficieRiemann({
         depth: number;
         color: string;
       };
+      // Un "Seg" es un tramo del lazo: una polilínea con varios
+      // puntos consecutivos. Pintar la curva tramo a tramo (en vez
+      // de segmento por segmento) reduce los "trompicones" que
+      // produce la intercalación con triángulos de la hoja: dentro
+      // de un tramo la línea es continua; entre tramos puede haber
+      // un triángulo del fondo intercalado.
       type Seg = {
         kind: 'seg';
-        sx0: number;
-        sy0: number;
-        sx1: number;
-        sy1: number;
+        pts: Array<{ sx: number; sy: number }>;
         depth: number;
         color: string;
       };
@@ -514,15 +628,22 @@ export function SuperficieRiemann({
           }
         }
       }
-      // Segmentos de las trayectorias del lazo, partidos por par de
-      // puntos consecutivos para que cada uno entre en el painter's
-      // con su profundidad propia y la geometría delante pueda
-      // ocluirlos. La trayectoria de la raíz POV se omite (arranca
+      // Trayectorias del lazo agrupadas en tramos de varios puntos
+      // consecutivos. Cada tramo entra al painter's con su
+      // profundidad media; los triángulos pueden tapar el tramo
+      // entero pero ya no recortan la curva entre vértices
+      // adyacentes, así que la línea se ve continua dentro del
+      // tramo. La trayectoria de la raíz POV se omite (arranca
       // pegada a la cámara).
       const numPasos = Math.min(
         ...trayectorias.map((t) => t.length),
         Math.max(0, lazo.length - 1),
       );
+      // Longitud del tramo en número de puntos. Con 8 las curvas
+      // se ven continuas y, dado que los puntos de la malla suelen
+      // ser bastante densos, los tramos siguen siendo cortos en
+      // profundidad y mantienen oclusión razonable.
+      const TRAMO = 8;
       if (numPasos >= 1 && trayectorias.length === DEGREE) {
         for (let k = 0; k < DEGREE; k++) {
           if (k === povIdx) continue;
@@ -541,21 +662,39 @@ export function SuperficieRiemann({
             }
             pts.push(proj([a[0], a[1], altura(r)]));
           }
-          // Generar segmentos entre puntos consecutivos visibles.
-          for (let i = 0; i + 1 < pts.length; i++) {
-            const A = pts[i];
-            const B = pts[i + 1];
-            if (!A || !B) continue;
+          // Acumular en tramos respetando los huecos (puntos null).
+          let buffer: Array<{ sx: number; sy: number; depth: number }> = [];
+          const flush = () => {
+            if (buffer.length < 2) {
+              buffer = [];
+              return;
+            }
+            let dSum = 0;
+            for (const p of buffer) dSum += p.depth;
             items.push({
               kind: 'seg',
-              sx0: A.sx,
-              sy0: A.sy,
-              sx1: B.sx,
-              sy1: B.sy,
-              depth: (A.depth + B.depth) / 2,
+              pts: buffer.map((p) => ({ sx: p.sx, sy: p.sy })),
+              depth: dSum / buffer.length,
               color,
             });
+            buffer = [];
+          };
+          for (let i = 0; i < pts.length; i++) {
+            const p = pts[i];
+            if (!p) {
+              flush();
+              continue;
+            }
+            buffer.push(p);
+            if (buffer.length >= TRAMO + 1) {
+              // Solapamos un punto con el siguiente tramo para que
+              // la curva no muestre "cortes" entre tramos.
+              const last = buffer[buffer.length - 1];
+              flush();
+              buffer.push(last);
+            }
           }
+          flush();
         }
       }
 
@@ -576,27 +715,57 @@ export function SuperficieRiemann({
           ctx.closePath();
           ctx.fill();
         } else {
-          // Halo blanco + trazo de color en cada segmento, igual
-          // que en orbital: aquí no se hace en una sola Path2D para
-          // que cada segmento se mezcle en su orden de profundidad
-          // y, al haber un triángulo delante, sea tapado por él.
+          // Tramo: polilínea con halo blanco + trazo de color.
+          // Una sola Path2D por tramo para que la curva quede
+          // visualmente continua dentro de él, aunque los tramos
+          // sigan respetando la oclusión con los triángulos.
+          if (it.pts.length < 2) continue;
           ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(it.pts[0].sx, it.pts[0].sy);
+          for (let q = 1; q < it.pts.length; q++) {
+            ctx.lineTo(it.pts[q].sx, it.pts[q].sy);
+          }
           ctx.strokeStyle = '#ffffff';
           ctx.globalAlpha = 0.8;
           ctx.lineWidth = 5.2;
-          ctx.beginPath();
-          ctx.moveTo(it.sx0, it.sy0);
-          ctx.lineTo(it.sx1, it.sy1);
           ctx.stroke();
           ctx.strokeStyle = it.color;
           ctx.globalAlpha = 1;
           ctx.lineWidth = 2.4;
-          ctx.beginPath();
-          ctx.moveTo(it.sx0, it.sy0);
-          ctx.lineTo(it.sx1, it.sy1);
           ctx.stroke();
         }
       }
+      // Segunda pasada de tramos como "fantasma" sobre toda la
+      // geometría: aunque la hoja del observador o una vecina
+      // tapen el lazo en el painter's principal, el fantasma se
+      // sigue viendo translúcido. Doble pasada por tramo:
+      // primero un outline oscuro y encima el color, así la
+      // curva se distingue incluso sobre una hoja del mismo
+      // color que la trayectoria.
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (let t = 0; t < items.length; t++) {
+        const it = items[t];
+        if (it.kind !== 'seg' || it.pts.length < 2) continue;
+        ctx.beginPath();
+        ctx.moveTo(it.pts[0].sx, it.pts[0].sy);
+        for (let q = 1; q < it.pts.length; q++) {
+          ctx.lineTo(it.pts[q].sx, it.pts[q].sy);
+        }
+        // Outline negro semitransparente (más ancho).
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.globalAlpha = 0.6;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        // Trazo de color encima del outline.
+        ctx.strokeStyle = it.color;
+        ctx.globalAlpha = 0.85;
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
     } else {
       // === Orbital: opacidad reducida y sin sort (más rápido) ===
       for (let k = 0; k < DEGREE; k++) {
@@ -849,20 +1018,17 @@ export function SuperficieRiemann({
   function onDoubleClick() {
     if (cameraMode === 'pov') {
       // Reset de la mirada: vuelve a orientar la cámara hacia el
-      // origen del mundo desde la posición actual de la raíz.
-      const fx = -currentAlpha[0];
-      const fy = -currentAlpha[1];
-      const fz = -camZPOV(malla, currentAlpha, povIdx);
-      const d = Math.hypot(fx, fy, fz);
-      if (d > 1e-6) {
-        const fzn = fz / d;
-        const cl = Math.max(-1, Math.min(1, fzn));
-        setPovPitch(Math.asin(cl));
-        setPovYaw(Math.atan2(fx / d, fy / d));
-      } else {
-        setPovYaw(0);
-        setPovPitch(0);
-      }
+      // origen del mundo. yaw/pitch en el frame local de la normal
+      // de la hoja para no descuadrar el drag posterior.
+      const camPos: Vec3 = [
+        currentAlpha[0],
+        currentAlpha[1],
+        camZPOV(malla, currentAlpha, povIdx),
+      ];
+      const up = normalEnAlpha(malla, currentAlpha, povIdx);
+      const { yaw, pitch } = yawPitchHaciaPunto([0, 0, 0], camPos, up);
+      setPovYaw(yaw);
+      setPovPitch(pitch);
       return;
     }
     onCamChange(DEFAULT_CAM);

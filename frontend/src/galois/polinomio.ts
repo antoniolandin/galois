@@ -133,11 +133,40 @@ export let BRANCH_X: Complex[] = (() => {
 
 // === Setter ===
 
+// Orden canónico del polinomio "estándar" del TFG (x^5 − x + α): la
+// raíz x = 0 va primera (color negro), después x = 1 (azul Okabe),
+// luego −1, i, −i. Cuando el backend devuelve las raíces en el
+// orden arbitrario de `np.roots`, las identificamos por proximidad
+// y, si TODAS coinciden con este conjunto, las reordenamos a este
+// orden. Otros polinomios se quedan en el orden del backend.
+const CANON_5: Complex[] = [
+  [0, 0],
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
+
 export function setPolinomioRuntime(info: PolinomioRuntimeInfo): void {
   _coefsAlpha = info.coefs_alpha.map((cs) =>
     cs.map(({ re, im }) => [re, im] as Complex),
   );
   DEGREE = info.grado;
-  INITIAL_ROOTS = info.raices_base.map(({ re, im }) => [re, im] as Complex);
   BRANCH_X = info.branch_x.map(({ re, im }) => [re, im] as Complex);
+  const raw: Complex[] = info.raices_base.map(
+    ({ re, im }) => [re, im] as Complex,
+  );
+  // Heurística: si las raíces base coinciden aproximadamente con
+  // {0, 1, −1, i, −i}, usamos el orden canónico para que los
+  // colores sigan la convención del polinomio inicial (negro = 0).
+  if (raw.length === CANON_5.length) {
+    const cuadran = CANON_5.every((c) =>
+      raw.some((r) => Math.hypot(r[0] - c[0], r[1] - c[1]) < 0.1),
+    );
+    if (cuadran) {
+      INITIAL_ROOTS = CANON_5.map((c) => [c[0], c[1]] as Complex);
+      return;
+    }
+  }
+  INITIAL_ROOTS = raw;
 }

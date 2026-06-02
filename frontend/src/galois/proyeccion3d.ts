@@ -39,6 +39,7 @@ export function projectFromLookAt(
   target: Vec3,
   w: number,
   h: number,
+  worldUp: Vec3 = [0, 0, 1],
 ): { sx: number; sy: number; depth: number } | null {
   // forward = (target - camPos), normalizado.
   let fx = target[0] - camPos[0];
@@ -56,10 +57,16 @@ export function projectFromLookAt(
   fx /= fn;
   fy /= fn;
   fz /= fn;
-  // right = forward × worldUp,  worldUp = (0, 0, 1)
-  let rx = fy * 1 - fz * 0;
-  let ry = fz * 0 - fx * 1;
-  let rz = fx * 0 - fy * 0;
+  // right = forward × worldUp. El `worldUp` por defecto es la
+  // vertical mundo `(0, 0, 1)`, pero en POV se puede pasar la
+  // normal local de la hoja para que la cámara se "incline" con
+  // la superficie.
+  const wux = worldUp[0];
+  const wuy = worldUp[1];
+  const wuz = worldUp[2];
+  let rx = fy * wuz - fz * wuy;
+  let ry = fz * wux - fx * wuz;
+  let rz = fx * wuy - fy * wux;
   let rn = Math.hypot(rx, ry, rz);
   if (rn < 1e-9) {
     // forward casi vertical: forzamos un "right" hacia +X.
