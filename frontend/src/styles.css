@@ -240,6 +240,11 @@ body {
   font-size: 18px;
   font-weight: 500;
   color: #1a1a1a;
+  /* `line-height` en píxeles para que el alto del line-box no dependa
+     del `font-size`. Sin esto, la fila "Estructura" cambia de alto al
+     pasar de placeholder italic (13 px) a contenido mono (16 px), y
+     empuja el retículo hacia abajo al añadir el primer generador. */
+  line-height: 22px;
 }
 .col-group .field-value.mono {
   font-family: var(--font-math);
