@@ -13,6 +13,7 @@ import { ModeSelector, type Mode } from './components/ModeSelector';
 import { PlanoAlpha } from './components/PlanoAlpha';
 import { PlanoX } from './components/PlanoX';
 import { PanelGrupo } from './components/PanelGrupo';
+import { SuperficieRiemann } from './components/SuperficieRiemann';
 import { Trayectorias3D } from './components/Trayectorias3D';
 import { ViewToggle, type View } from './components/ViewToggle';
 
@@ -315,11 +316,14 @@ export default function App() {
               roots={displayRoots}
             />
           ) : (
-            <div className="viewport-placeholder">
-              <div className="icon">◐</div>
-              <div className="caption">Vista 3D con superficie de Riemann</div>
-              <div className="sub">próximamente</div>
-            </div>
+            <SuperficieRiemann
+              ramificacion={ramificacion}
+              currentAlpha={currentAlpha}
+              roots={displayRoots}
+              lazo={displayLazo ?? liveLazo}
+              trayectorias={displayTrayectorias}
+              startRoots={displayStartRoots}
+            />
           )}
         </div>
 
