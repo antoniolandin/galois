@@ -17,6 +17,53 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Overlay de loading durante el cambio de polinomio. Tapa toda
+   la app mientras el backend recalcula la geometría y el frontend
+   reconstruye la malla de la superficie de Riemann (que para
+   polinomios de grado alto puede tardar segundos). */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(243, 243, 245, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: loading-fade-in 0.12s ease-out;
+}
+@keyframes loading-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.loading-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  padding: 14px 22px;
+  border: 1px solid #d8d8d8;
+  border-radius: 8px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  color: #1a1a1a;
+}
+.loading-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #e0e0e0;
+  border-top-color: #1a1a1a;
+  animation: loading-spin 0.8s linear infinite;
+}
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+.loading-text {
+  font-family: var(--font-ui);
+}
+
 .app {
   display: grid;
   grid-template-rows: 56px 1fr;

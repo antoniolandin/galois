@@ -44,6 +44,10 @@ export interface GeneradorGuardado {
 
 export default function App() {
   const [polinomio, setPolinomio] = useState<PolinomioInfo | null>(null);
+  // Overlay de loading durante el cambio de polinomio: tapamos la
+  // app mientras el backend recalcula (grupo de Galois, ramif…) y
+  // mientras el frontend reconstruye la malla de Riemann.
+  const [loadingPolinomio, setLoadingPolinomio] = useState(false);
   // Grupo de Galois objetivo del polinomio actual. Lo calcula el
   // backend al arrancar (Hauenstein sin animar + GAP). Cuando el
   // subgrupo descubierto coincide con éste, marcamos la pill de
@@ -306,7 +310,16 @@ export default function App() {
     async (expresion: string) => {
       stoppedAleatorioRef.current = true;
       stoppedHauensteinRef.current = true;
-      const info = await postPolinomio(expresion);
+      setLoadingPolinomio(true);
+      let info: PolinomioInfo;
+      try {
+        info = await postPolinomio(expresion);
+      } catch (e) {
+        // Apagamos el overlay y propagamos el error al Header
+        // para que muestre el mensaje del backend al usuario.
+        setLoadingPolinomio(false);
+        throw e;
+      }
       // Reconfigurar las bindings runtime del módulo `polinomio.ts`
       // ANTES de pintar nada con el nuevo polinomio: P, Px, DEGREE,
       // INITIAL_ROOTS, etc., apuntarán al polinomio nuevo.
@@ -343,10 +356,26 @@ export default function App() {
       setRunningHauenstein(false);
       // Remount del árbol: invalida `useMemo`/`useEffect` que
       // hayan capturado las constantes del polinomio anterior.
+      // El overlay de loading se cierra desde un useEffect que
+      // detecta el cambio de `polinomioKey` (más abajo). Así no
+      // dependemos de rAFs encadenados con los renders pesados.
       setPolinomioKey((k) => k + 1);
     },
     [resetTrayectorias],
   );
+
+  // Cierre del overlay: el effect solo depende de `polinomioKey`,
+  // que sólo cambia con el último `setPolinomioKey((k) => k + 1)`
+  // del handler. Como los useEffect se ejecutan post-commit, en
+  // este punto el remount con la malla nueva ya está pintado.
+  // El `polinomioKey === 0` inicial (montaje sin cambio de
+  // polinomio) se ignora para que el overlay no se cierre al
+  // primer render.
+  useEffect(() => {
+    if (polinomioKey === 0) return;
+    const t = setTimeout(() => setLoadingPolinomio(false), 0);
+    return () => clearTimeout(t);
+  }, [polinomioKey]);
 
   // Bucle del modo Aleatorio (Leykin–Sottile): genera lazos
   // pseudoaleatorios alrededor de los puntos de ramificación, los
@@ -838,6 +867,14 @@ export default function App() {
 
   return (
     <div className="app">
+      {loadingPolinomio && (
+        <div className="loading-overlay" role="status" aria-live="polite">
+          <div className="loading-card">
+            <div className="loading-spinner" aria-hidden />
+            <div className="loading-text">Recalculando polinomio…</div>
+          </div>
+        </div>
+      )}
       <Header
         expresion={polinomio.expresion}
         onChangeExpresion={handleChangeExpresion}
