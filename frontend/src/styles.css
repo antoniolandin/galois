@@ -488,12 +488,11 @@ body {
 .col-group .gens .gen:hover { background: #ececef; }
 .col-group .gens .gen:last-child { border-bottom: none; }
 .col-group .gens .gen.selected {
-  /* Fondo blanco para que destaque sobre el gris de la caja y un
-     acento gris oscuro a la izquierda como "tab activo". Sin box
-     model adicional: usamos `box-shadow: inset` para no descuadrar
-     el padding del item. */
-  background: #ffffff;
-  box-shadow: inset 3px 0 0 #1a1a1a;
+  /* Fondo gris suave un poco más oscuro que el de la caja
+     (#fafafa). Sin acento lateral ni cambio de color de texto:
+     el highlight se nota pero queda discreto y no descuadra el
+     padding del item. */
+  background: #e4e4e8;
 }
 .col-group .gens .index {
   color: #666;
