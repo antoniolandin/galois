@@ -13,6 +13,7 @@ import { ModeSelector, type Mode } from './components/ModeSelector';
 import { PlanoAlpha } from './components/PlanoAlpha';
 import { PlanoX } from './components/PlanoX';
 import { PanelGrupo } from './components/PanelGrupo';
+import { Trayectorias3D } from './components/Trayectorias3D';
 import { ViewToggle, type View } from './components/ViewToggle';
 
 // Un generador guardado lleva consigo todo el contexto visual que se
@@ -39,6 +40,10 @@ export default function App() {
   const [trayectorias, setTrayectorias] = useState<Complex[][]>(() =>
     INITIAL_ROOTS.map(() => [] as Complex[]),
   );
+  // Espejo del lazo vivo de PlanoAlpha. Lo necesitamos en App para
+  // que Trayectorias3D pueda dibujarlo a la par que el drag, sin
+  // levantar el state completo del PlanoAlpha.
+  const [liveLazo, setLiveLazo] = useState<Complex[]>([]);
 
   const [generadores, setGeneradores] = useState<GeneradorGuardado[]>([]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -269,6 +274,7 @@ export default function App() {
             resetTrayectorias={resetTrayectorias}
             onLoopEnd={handleLoopEnd}
             onInteraction={handleCanvasInteraction}
+            onLazoChange={setLiveLazo}
           />
 
           <div className="controls">
@@ -298,15 +304,20 @@ export default function App() {
               startRoots={displayStartRoots}
               trayectorias={displayTrayectorias}
             />
+          ) : view === 'trayectorias' ? (
+            <Trayectorias3D
+              ramificacion={ramificacion}
+              alphaEstrella={alphaEstrella}
+              currentAlpha={currentAlpha}
+              lazo={displayLazo ?? liveLazo}
+              trayectorias={displayTrayectorias}
+              startRoots={displayStartRoots}
+              roots={displayRoots}
+            />
           ) : (
             <div className="viewport-placeholder">
               <div className="icon">◐</div>
-              <div className="caption">
-                Vista 3D
-                {view === 'superficie'
-                  ? ' (con superficie de Riemann)'
-                  : ' (solo trayectorias)'}
-              </div>
+              <div className="caption">Vista 3D con superficie de Riemann</div>
               <div className="sub">próximamente</div>
             </div>
           )}

@@ -43,6 +43,9 @@ interface Props {
   // Avisa al padre cuando el usuario interactúa con el canvas para
   // que pueda limpiar la selección del generador mostrado, si la había.
   onInteraction: () => void;
+  // Espejo del lazo interno hacia el padre, para que la vista 3D
+  // pueda leerlo en vivo. Se dispara en cada cambio del array.
+  onLazoChange?: (lazo: Complex[]) => void;
 }
 
 // Tolerancia para considerar que α ha vuelto al punto de inicio del lazo.
@@ -61,6 +64,7 @@ export function PlanoAlpha({
   resetTrayectorias,
   onLoopEnd,
   onInteraction,
+  onLazoChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDraggingRef = useRef(false);
@@ -102,6 +106,14 @@ export function PlanoAlpha({
     }
     setLazo([]);
   }, [clearLazoSignal]);
+
+  // Espejo del lazo hacia el padre. Cada vez que `lazo` cambia
+  // (mousedown, mousemove, mouseup, clear), notificamos al padre con
+  // el array nuevo. Permite a `Trayectorias3D` consumir el lazo
+  // vivo sin levantar el state completo.
+  useEffect(() => {
+    onLazoChange?.(lazo);
+  }, [lazo, onLazoChange]);
 
   // ResizeObserver: sincroniza el buffer del canvas con el tamaño CSS
   // y mantiene `size` en state para disparar redibujo cuando cambia.
