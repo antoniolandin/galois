@@ -3,9 +3,11 @@ import type { Complex } from './galois/complex';
 import { INITIAL_ROOTS } from './galois/polinomio';
 import { emparejarPorProximidad } from './galois/monodromia';
 import {
+  getGaloisObjetivo,
   getPolinomio,
   getSubgrupo,
   postPermutacion,
+  type GrupoObjetivo,
   type PolinomioInfo,
   type SubgrupoResponse,
 } from './api/client';
@@ -23,6 +25,7 @@ import { SuperficieRiemann } from './components/SuperficieRiemann';
 import { Trayectorias3D } from './components/Trayectorias3D';
 import { ViewToggle, type View } from './components/ViewToggle';
 import { CameraToggle, type CameraMode } from './components/CameraToggle';
+import { StatsPills } from './components/StatsPills';
 import { DEFAULT_CAM, type CamState } from './galois/proyeccion3d';
 
 // Un generador guardado lleva consigo todo el contexto visual que se
@@ -40,6 +43,14 @@ export interface GeneradorGuardado {
 
 export default function App() {
   const [polinomio, setPolinomio] = useState<PolinomioInfo | null>(null);
+  // Grupo de Galois objetivo del polinomio actual. Lo calcula el
+  // backend al arrancar (Hauenstein sin animar + GAP). Cuando el
+  // subgrupo descubierto coincide con éste, marcamos la pill de
+  // Estructura en verde y los bucles automáticos se saltan la
+  // primera iteración (ya no hay nada que añadir).
+  const [galoisObjetivo, setGaloisObjetivo] = useState<GrupoObjetivo | null>(
+    null,
+  );
   const [mode, setMode] = useState<Mode>('manual');
   const [view, setView] = useState<View>('plano-x');
   const [cameraMode, setCameraMode] = useState<CameraMode>('orbital');
@@ -112,6 +123,11 @@ export default function App() {
       .then(setPolinomio)
       .catch((err) => {
         console.error('Backend no accesible:', err);
+      });
+    getGaloisObjetivo()
+      .then(setGaloisObjetivo)
+      .catch((err) => {
+        console.warn('No se pudo obtener el grupo de Galois objetivo:', err);
       });
   }, []);
 
@@ -276,6 +292,11 @@ export default function App() {
   }, []);
   const handleRunAleatorio = useCallback(async () => {
     if (!polinomio || runningAleatorio) return;
+    // El criterio de parada lo evalúa el bucle en la primera
+    // iteración consultando al backend con la lista de generadores
+    // actual: si ya estamos en el objetivo, sale sin animar. Una
+    // guarda aquí basada en el state `subgrupo` quedaría stale
+    // justo después de borrar una permutación.
     stoppedAleatorioRef.current = false;
     setRunningAleatorio(true);
     setIterAleatorio(0);
@@ -332,7 +353,10 @@ export default function App() {
         try {
           const grupo = await getSubgrupo(perms, n);
           if (stoppedAleatorioRef.current) break;
-          if (grupo.estructura === `S_${n}`) break;
+          const alcanzado = galoisObjetivo
+            ? grupo.orden === galoisObjetivo.orden
+            : grupo.estructura === `S_${n}`;
+          if (alcanzado) break;
         } catch (e) {
           console.error('[aleatorio] error al consultar el grupo', e);
           break;
@@ -419,6 +443,8 @@ export default function App() {
     addGenerador,
     pushTrayectoria,
     resetTrayectorias,
+    galoisObjetivo,
+    subgrupo,
   ]);
 
   // Bucle del modo Hauenstein–Rodríguez–Sottile: recorre cada
@@ -433,6 +459,10 @@ export default function App() {
   }, []);
   const handleRunHauenstein = useCallback(async () => {
     if (!polinomio || runningHauenstein) return;
+    // Sin guarda inicial basada en `subgrupo`: si acabamos de
+    // borrar un generador, el state aún tiene el orden previo y
+    // bloquearía el rearranque. El bucle hace `getSubgrupo` en su
+    // primera iteración y para si ya estamos en el objetivo.
     stoppedHauensteinRef.current = false;
     setRunningHauenstein(true);
     setIterHauenstein(0);
@@ -481,7 +511,10 @@ export default function App() {
           try {
             const g0 = await getSubgrupo(perms, n);
             if (stoppedHauensteinRef.current) break rondas;
-            if (g0.estructura === `S_${n}`) break rondas;
+            const alcanzado = galoisObjetivo
+              ? g0.orden === galoisObjetivo.orden
+              : g0.estructura === `S_${n}`;
+            if (alcanzado) break rondas;
             ordenPrevio = g0.orden;
           } catch (e) {
             console.error('[hauenstein] error al consultar el grupo', e);
@@ -546,7 +579,10 @@ export default function App() {
             false,
           );
           anadidoEnRonda = true;
-          if (grupoCandidato.estructura === `S_${n}`) break rondas;
+          const alcanzadoTras = galoisObjetivo
+            ? grupoCandidato.orden === galoisObjetivo.orden
+            : grupoCandidato.estructura === `S_${n}`;
+          if (alcanzadoTras) break rondas;
         } catch (e) {
           console.error('[hauenstein] error al calcular permutación', e);
           break rondas;
@@ -574,6 +610,8 @@ export default function App() {
     addGenerador,
     pushTrayectoria,
     resetTrayectorias,
+    galoisObjetivo,
+    subgrupo,
   ]);
 
   // Re-arranque automático cuando el usuario borra un generador
@@ -693,6 +731,11 @@ export default function App() {
   const displayAlpha: Complex = selectedGen
     ? selectedGen.lazo[selectedGen.lazo.length - 1] ?? selectedGen.startAlpha
     : currentAlpha;
+  // El subgrupo descubierto coincide con el grupo de Galois objetivo.
+  const grupoCompleto =
+    galoisObjetivo != null &&
+    subgrupo != null &&
+    subgrupo.orden === galoisObjetivo.orden;
 
   return (
     <div className="app">
@@ -732,6 +775,7 @@ export default function App() {
                   onClick={
                     runningAleatorio ? handleStopAleatorio : handleRunAleatorio
                   }
+                  disabled={!runningAleatorio && grupoCompleto}
                 >
                   {runningAleatorio
                     ? `Detener (iter ${iterAleatorio})`
@@ -754,6 +798,7 @@ export default function App() {
                       ? handleStopHauenstein
                       : handleRunHauenstein
                   }
+                  disabled={!runningHauenstein && grupoCompleto}
                 >
                   {runningHauenstein
                     ? `Detener (B ${iterHauenstein}/${
@@ -794,6 +839,7 @@ export default function App() {
         <div className="panel col-viewport">
           <div className="viewport-overlay">
             <ViewToggle view={view} onChange={setView} />
+            <StatsPills subgrupo={subgrupo} completo={grupoCompleto} />
           </div>
           {view === 'superficie' && (
             <CameraToggle

@@ -52,6 +52,17 @@ export async function getPolinomio(): Promise<PolinomioInfo> {
   return r.json();
 }
 
+export interface GrupoObjetivo {
+  estructura: string;
+  orden: number;
+}
+
+export async function getGaloisObjetivo(): Promise<GrupoObjetivo> {
+  const r = await fetch('/api/galois-objetivo');
+  if (!r.ok) throw new Error(`GET /api/galois-objetivo: ${r.status}`);
+  return r.json();
+}
+
 export async function getSubgrupo(
   generadores: number[][],
   grado: number,

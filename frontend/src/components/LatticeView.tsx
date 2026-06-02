@@ -1,11 +1,11 @@
 // Retículo de subgrupos: vista SVG interactiva con zoom y pan.
 //
 // Cada nodo es una clase de conjugación de subgrupos del grupo actual.
-// El retículo se dibuja en horizontal: el subgrupo trivial queda a la
-// izquierda y el grupo completo a la derecha, con los niveles de orden
-// avanzando de izquierda a derecha. Esta orientación encaja mejor con
-// los paneles anchos y poco altos. Una arista entre dos nodos indica
-// que el de menor orden es subgrupo maximal del de mayor orden.
+// El retículo se dibuja en vertical: el subgrupo trivial queda
+// abajo y el grupo completo arriba (convención habitual en teoría de
+// grupos: el ínfimo abajo, el supremo arriba). Una arista entre dos
+// nodos indica que el de menor orden es subgrupo maximal del de
+// mayor orden.
 //
 // El layout usa coordenadas "naturales" con espaciado mínimo fijo
 // para que los nodos nunca se apilen. Al montar (y cuando cambia la
@@ -65,20 +65,24 @@ function computarLayout(nodos: LatticeNodo[]): Layout {
     const f = porOrden.get(o)!.length;
     if (f > maxFila) maxFila = f;
   }
-  const bboxW = (niveles - 1) * MIN_LEVEL_GAP;
-  const bboxH = (maxFila - 1) * MIN_NODE_GAP;
+  // Orientación vertical: el eje horizontal recoge los nodos
+  // dentro de un mismo nivel y el vertical, los niveles de orden.
+  // El trivial (orden mínimo, i = 0) queda en la parte inferior
+  // (y máxima) y el grupo completo en la superior (y = 0).
+  const bboxW = (maxFila - 1) * MIN_NODE_GAP;
+  const bboxH = (niveles - 1) * MIN_LEVEL_GAP;
 
   for (let i = 0; i < niveles; i++) {
     const orden = ordenes[i];
     const fila = porOrden.get(orden)!;
     const num = fila.length;
-    const x = i * MIN_LEVEL_GAP; // orden creciente hacia la derecha
-    const filaH = (num - 1) * MIN_NODE_GAP;
-    const startY = (bboxH - filaH) / 2;
+    const y = (niveles - 1 - i) * MIN_LEVEL_GAP;
+    const filaW = (num - 1) * MIN_NODE_GAP;
+    const startX = (bboxW - filaW) / 2;
     for (let j = 0; j < num; j++) {
       positions.set(fila[j].id, {
-        x,
-        y: num > 1 ? startY + j * MIN_NODE_GAP : bboxH / 2,
+        x: num > 1 ? startX + j * MIN_NODE_GAP : bboxW / 2,
+        y,
       });
     }
   }

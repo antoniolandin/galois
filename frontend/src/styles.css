@@ -73,15 +73,20 @@ body {
 }
 
 /* ============ Col 1: plano α ============ */
+/* El canvas del plano α es siempre un cuadrado del ancho de la
+   columna. Si la columna es más alta que ancha (cosa habitual en
+   pantallas anchas), el espacio vertical sobrante se va al fondo
+   y los botones quedan empujados ahí abajo con `margin-top: auto`. */
 .col-alpha {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
+  min-height: 0;
 }
 .canvas-alpha {
+  flex: 0 0 auto;
+  width: 100%;
   aspect-ratio: 1;
-  width: clamp(140px, calc(100vh - 300px), 100%);
-  margin: 0 auto;
   background: #fafafa;
   border: 1px dashed #d0d0d0;
   border-radius: 4px;
@@ -166,8 +171,96 @@ body {
   right: 14px;
   display: flex;
   gap: 16px;
+  align-items: center;
   z-index: 10;
   pointer-events: none;
+}
+
+/* Pills informativas con los stats del subgrupo (estructura, orden,
+   iter) que flotan a la derecha del toggle de vistas. Sustituyen
+   los campos "Estructura" y "Orden" que antes vivían en la columna
+   derecha. La pill de Estructura es la que despliega un tooltip al
+   hacer hover con las propiedades abstractas que devuelve GAP. */
+.stat-pills {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  pointer-events: auto;
+}
+.stat-pills .pill {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #d8d8d8;
+  border-radius: 999px;
+  font-size: 12px;
+  backdrop-filter: blur(4px);
+}
+.stat-pills .pill .lbl {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #999;
+}
+.stat-pills .pill .val {
+  font-family: var(--font-math);
+  color: #1a1a1a;
+  font-size: 13px;
+}
+.stat-pills .pill .val.num {
+  font-family: var(--font-ui);
+  font-weight: 500;
+}
+.stat-pills .pill.empty .val {
+  font-style: italic;
+  color: #aaa;
+}
+.stat-pills .pill-est { cursor: default; }
+/* Variante "completo": el subgrupo descubierto coincide con el
+   grupo de Galois objetivo del polinomio. Verde para indicar
+   "ya hemos llegado al final". */
+.stat-pills .pill-est.completo {
+  background: rgba(232, 245, 233, 0.96);
+  border-color: #66bb6a;
+  color: #1b5e20;
+}
+.stat-pills .pill-est.completo .lbl {
+  color: #2e7d32;
+}
+.stat-pills .pill-est.completo .val {
+  color: #1b5e20;
+}
+.stat-pills .pill-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  font-size: 12px;
+}
+.stat-pills .pill-tooltip dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  margin: 0;
+}
+.stat-pills .pill-tooltip dt {
+  color: #888;
+  font-weight: 600;
+}
+.stat-pills .pill-tooltip dd {
+  color: #1a1a1a;
+  font-family: var(--font-math);
+  margin: 0;
 }
 .toggle-group {
   display: flex;
@@ -281,15 +374,22 @@ body {
 }
 
 /* ============ Col 3: subgrupo ============ */
-/* Anula el `overflow: auto` heredado de `.panel`: el panel nunca debe
-   mostrar scrollbar. Los campos van con su alto natural en flujo
-   normal; el `padding-bottom` del panel se eleva a 36 px para que el
-   retículo no quede pegado al borde inferior. */
+/* Layout flex: la lista de generadores tiene un alto fijo y el
+   campo del retículo crece para llenar el resto. Anulamos
+   `overflow: auto` heredado de `.panel` porque dentro de `.gens` y
+   de `.lattice-view` ya hay sus propios contenedores con scroll. */
 .col-group {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  padding-bottom: 36px;
+  padding-bottom: 18px;
 }
 .col-group .field { margin-bottom: 18px; }
+.col-group .field.lattice-field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
 .col-group .field-label {
   font-size: 10px;
   font-weight: 700;
@@ -321,12 +421,17 @@ body {
 .col-group .gens {
   font-family: var(--font-math);
   font-size: 14px;
-  /* Hueco fijo para ≈3 generadores. Se renderiza siempre (incluso
+  /* Hueco fijo para ≈8 generadores. Se renderiza siempre (incluso
      en estado vacío) para que el retículo no salte de posición al
      añadir el primer generador. Si aparecen más, el scroll vive aquí
-     dentro, no en el panel. */
-  height: 80px;
+     dentro, no en el panel. Fondo gris suave + borde para que la
+     zona quede claramente delimitada y no parezca "flotando". */
+  height: 220px;
   overflow-y: auto;
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 4px 8px;
 }
 .col-group .gens .gen {
   display: flex;
@@ -337,11 +442,15 @@ body {
   cursor: pointer;
   border-radius: 4px;
 }
-.col-group .gens .gen:hover { background: #f5f5f7; }
+.col-group .gens .gen:hover { background: #ececef; }
 .col-group .gens .gen:last-child { border-bottom: none; }
 .col-group .gens .gen.selected {
-  background: #e8f0f8;
-  border-bottom: 1px solid #c8d8e8;
+  /* Fondo blanco para que destaque sobre el gris de la caja y un
+     acento gris oscuro a la izquierda como "tab activo". Sin box
+     model adicional: usamos `box-shadow: inset` para no descuadrar
+     el padding del item. */
+  background: #ffffff;
+  box-shadow: inset 3px 0 0 #1a1a1a;
 }
 .col-group .gens .index {
   color: #666;
@@ -379,14 +488,13 @@ body {
   height: 100%;
 }
 
-/* Retículo de subgrupos: alto fijo. Como la lista de generadores
-   tiene un alto fijo, añadir generadores no reduce el retículo.
-   `margin-bottom: 36px` directo sobre el view + `padding-bottom`
-   extra del panel = ≥ 72 px de aire bajo el retículo, garantizados
-   incluso si el contenido sobra y `overflow: hidden` recorta. */
+/* Retículo de subgrupos: caja cuadrada del ancho de la columna,
+   por consistencia con el plano α (ambos viven en columnas
+   estrechas, así nunca quedan rectángulos alargados según la
+   pantalla). El espacio vertical que sobra abajo es aceptable. */
 .lattice-view {
-  height: 180px;
-  margin-bottom: 36px;
+  width: 100%;
+  aspect-ratio: 1;
   background: #fafafa;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
@@ -398,35 +506,3 @@ body {
   display: block;
 }
 
-/* Tooltip sobre la fila "Estructura" con la información extra de GAP */
-.col-group .field.has-tooltip {
-  position: relative;
-}
-.col-group .tooltip {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  background: #ffffff;
-  border: 1px solid #d0d0d0;
-  border-radius: 6px;
-  padding: 10px 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-  z-index: 100;
-  font-size: 12px;
-}
-.col-group .tooltip dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 14px;
-  margin: 0;
-}
-.col-group .tooltip dt {
-  color: #888;
-  font-weight: 600;
-}
-.col-group .tooltip dd {
-  color: #1a1a1a;
-  font-family: var(--font-math);
-  margin: 0;
-}
