@@ -187,9 +187,13 @@ function computarMundo(
   baseRFijo: number,
   altRFijo: number,
 ): { baseR: number; altR: number } {
+  // Mismo cap relativo que en la vista de trayectorias: el cubo
+  // no puede ser más de un 60 % más alto que ancho.
+  const baseR = Math.max(baseRFijo * 1.15, 0.6);
+  const altCap = baseR * 1.6;
   return {
-    baseR: Math.max(baseRFijo * 1.15, 0.6),
-    altR: Math.max(altRFijo * 1.15, 1.2),
+    baseR,
+    altR: Math.max(Math.min(altRFijo * 1.15, altCap), 1.2),
   };
 }
 

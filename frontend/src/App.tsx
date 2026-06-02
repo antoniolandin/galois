@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Complex } from './galois/complex';
-import { INITIAL_ROOTS } from './galois/polinomio';
+import { INITIAL_ROOTS, setPolinomioRuntime } from './galois/polinomio';
 import { emparejarPorProximidad } from './galois/monodromia';
 import {
   getGaloisObjetivo,
   getPolinomio,
   getSubgrupo,
   postPermutacion,
+  postPolinomio,
   type GrupoObjetivo,
   type PolinomioInfo,
   type SubgrupoResponse,
@@ -117,10 +118,20 @@ export default function App() {
     generadoresRef.current = generadores;
   }, [generadores]);
 
+  // Clave para forzar remount del árbol cuando cambia el polinomio:
+  // las constantes mutables del módulo `polinomio.ts` (P, Px, DEGREE,
+  // INITIAL_ROOTS, ...) se han actualizado, pero los hijos que las
+  // capturaron en `useMemo`/`useEffect` no se invalidan solos. Un
+  // remount completo limpia esa caché.
+  const [polinomioKey, setPolinomioKey] = useState(0);
+
   // Cargar info del polinomio al montar
   useEffect(() => {
     getPolinomio()
-      .then(setPolinomio)
+      .then((info) => {
+        setPolinomioRuntime(info);
+        setPolinomio(info);
+      })
       .catch((err) => {
         console.error('Backend no accesible:', err);
       });
@@ -281,6 +292,58 @@ export default function App() {
     setSelectedIdx((prev) => (prev == null ? prev : null));
   }, []);
 
+  // Cambio del polinomio activo desde el header. Lo gestiona el
+  // backend (parseo + validación + recálculo de ramif./raíces) y
+  // aquí reseteamos absolutamente todo: generadores, lazo en curso,
+  // raíces actuales, modo (volvemos a Manual para que el usuario
+  // no se quede con un bucle automático corriendo sobre datos del
+  // polinomio anterior).
+  const handleChangeExpresion = useCallback(
+    async (expresion: string) => {
+      stoppedAleatorioRef.current = true;
+      stoppedHauensteinRef.current = true;
+      const info = await postPolinomio(expresion);
+      // Reconfigurar las bindings runtime del módulo `polinomio.ts`
+      // ANTES de pintar nada con el nuevo polinomio: P, Px, DEGREE,
+      // INITIAL_ROOTS, etc., apuntarán al polinomio nuevo.
+      setPolinomioRuntime(info);
+      setPolinomio(info);
+      // El grupo de Galois objetivo del nuevo polinomio.
+      try {
+        const obj = await getGaloisObjetivo();
+        setGaloisObjetivo(obj);
+      } catch (e) {
+        console.warn(
+          'No se pudo obtener el grupo de Galois objetivo del nuevo polinomio:',
+          e,
+        );
+        setGaloisObjetivo(null);
+      }
+      // Punto base actualizado para que el reset visual no use el
+      // viejo (0, 0) que para algunos polinomios cae sobre un branch.
+      const alpha0: Complex = [info.alpha_estrella.re, info.alpha_estrella.im];
+      const raicesIni: Complex[] = info.raices_base.map(
+        (p) => [p.re, p.im] as Complex,
+      );
+      setGeneradores([]);
+      setSelectedIdx(null);
+      setSubgrupo(null);
+      setCurrentAlpha(alpha0);
+      setCurrentRoots(raicesIni);
+      setStartRoots(raicesIni);
+      setLiveLazo([]);
+      resetTrayectorias();
+      setResetKey((k) => k + 1);
+      setMode('manual');
+      setRunningAleatorio(false);
+      setRunningHauenstein(false);
+      // Remount del árbol: invalida `useMemo`/`useEffect` que
+      // hayan capturado las constantes del polinomio anterior.
+      setPolinomioKey((k) => k + 1);
+    },
+    [resetTrayectorias],
+  );
+
   // Bucle del modo Aleatorio (Leykin–Sottile): genera lazos
   // pseudoaleatorios alrededor de los puntos de ramificación, los
   // manda al backend, acumula los generadores no identidad y comprueba
@@ -347,21 +410,25 @@ export default function App() {
       // Las permutaciones se releen del ref, así reflejan los
       // borrados que el usuario haga en el panel mientras corre.
       const perms = generadoresRef.current.map((g) => g.permutacion);
-      // Criterio de parada: subgrupo == S_n. La comprobación pasa
-      // por GAP en el backend; sólo se hace si ya hay generadores.
+      // Criterio de parada: subgrupo descubierto == grupo de Galois
+      // objetivo. Si no hay generadores aún, el subgrupo es trivial
+      // (orden 1); seguimos parando si ese ya es el objetivo (caso
+      // de polinomios como x + α, donde el grupo de Galois es {e}).
+      let ordenActual = 1;
       if (perms.length > 0) {
         try {
           const grupo = await getSubgrupo(perms, n);
           if (stoppedAleatorioRef.current) break;
-          const alcanzado = galoisObjetivo
-            ? grupo.orden === galoisObjetivo.orden
-            : grupo.estructura === `S_${n}`;
-          if (alcanzado) break;
+          ordenActual = grupo.orden;
         } catch (e) {
           console.error('[aleatorio] error al consultar el grupo', e);
           break;
         }
       }
+      const alcanzado = galoisObjetivo
+        ? ordenActual === galoisObjetivo.orden
+        : false;
+      if (alcanzado) break;
       setIterAleatorio(iter + 1);
       const lazo = generarLazoAleatorio(alphaEstrellaLocal, ramif);
       try {
@@ -511,15 +578,17 @@ export default function App() {
           try {
             const g0 = await getSubgrupo(perms, n);
             if (stoppedHauensteinRef.current) break rondas;
-            const alcanzado = galoisObjetivo
-              ? g0.orden === galoisObjetivo.orden
-              : g0.estructura === `S_${n}`;
-            if (alcanzado) break rondas;
             ordenPrevio = g0.orden;
           } catch (e) {
             console.error('[hauenstein] error al consultar el grupo', e);
             break rondas;
           }
+        }
+        // Si el grupo descubierto ya coincide con el objetivo
+        // (incluido el caso trivial perms.length == 0 con grupo
+        // de Galois {e}), salimos sin animar.
+        if (galoisObjetivo && ordenPrevio === galoisObjetivo.orden) {
+          break rondas;
         }
         const bi = ramif[idx];
         const otrosB = ramif.filter((_, j) => j !== idx);
@@ -739,8 +808,11 @@ export default function App() {
 
   return (
     <div className="app">
-      <Header expresion={polinomio.expresion} />
-      <div className="main">
+      <Header
+        expresion={polinomio.expresion}
+        onChangeExpresion={handleChangeExpresion}
+      />
+      <div className="main" key={polinomioKey}>
         {/* --- Columna 1: plano α --- */}
         <div className="panel col-alpha">
           <div className="panel-label">Modo</div>
@@ -754,7 +826,12 @@ export default function App() {
             ramificacion={ramificacion}
             alphaEstrella={alphaEstrella}
             currentAlpha={currentAlpha}
-            displayLazo={displayLazo}
+            displayLazo={
+              displayLazo ??
+              (mode !== 'manual' && (liveLazo?.length ?? 0) > 1
+                ? liveLazo
+                : null)
+            }
             clearLazoSignal={clearLazoSignal}
             setAlpha={setCurrentAlpha}
             setRoots={setCurrentRoots}

@@ -119,11 +119,18 @@ export function altMaxPolinomio(baseR: number): number {
       muestras.push([ax, ay]);
     }
   }
+  // Cota superior absoluta para descartar las divergencias de
+  // Durand-Kerner sobre raices multiples (por ejemplo en alpha = 0
+  // para x^n - alpha): cuando dos raices coinciden, el denominador
+  // de la formula DK se anula y las raices se disparan.
+  const TECHO = 12;
   let maxH = 0;
   for (const a of muestras) {
     const rs = durandKerner(a, INITIAL_ROOTS as unknown as Complex[]);
     for (const r of rs) {
       const h = Math.abs(r[0] + 0.5 * r[1]);
+      if (!Number.isFinite(h)) continue;
+      if (h > TECHO) continue;
       if (h > maxH) maxH = h;
     }
   }

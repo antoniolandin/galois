@@ -32,6 +32,25 @@ class PolinomioInfo(BaseModel):
     raices_base: list[Complejo] = Field(
         ..., description="Raices de P(x, alpha_estrella), en el orden de np.roots"
     )
+    branch_x: list[Complejo] = Field(
+        default_factory=list,
+        description=(
+            "Raices dobles de P en x: para cada α_b en la "
+            "ramificacion, los ceros simultaneos de P(x, α_b) = 0 y "
+            "∂P/∂x(x, α_b) = 0. Sirven al frontend para pintarlos "
+            "en el plano x como marcadores 'fantasma'."
+        ),
+    )
+    coefs_alpha: list[list[Complejo]] = Field(
+        ...,
+        description=(
+            "Coeficientes del polinomio en x con cada coeficiente "
+            "expandido como polinomio en alpha. coefs_alpha[k] es la "
+            "lista de coeficientes de a_k(alpha), en orden de grado "
+            "decreciente en alpha. coefs_alpha[0] = a_n (lider, "
+            "normalmente [{1, 0}] por monicidad)."
+        ),
+    )
 
 
 class LazoRequest(BaseModel):
@@ -98,6 +117,16 @@ class GrupoObjetivoResponse(BaseModel):
 
     estructura: str
     orden: int
+
+
+class PolinomioRequest(BaseModel):
+    """Petición del frontend para cambiar el polinomio actual.
+
+    La expresión se admite con sintaxis sympy estándar (`x**5 - x + alpha`)
+    o con `^` como sinónimo de `**` (`x^5 - x + alpha`). Se acepta
+    también `α` como alias de `alpha`."""
+
+    expresion: str = Field(..., min_length=1)
 
 
 class SubgrupoResponse(BaseModel):

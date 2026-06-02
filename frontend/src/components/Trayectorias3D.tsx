@@ -70,11 +70,16 @@ const BOX_COLOR = '#d8d8db';
 // wireframe. La función altura `h(x) = Re(x) + ½ Im(x)` se
 // reproduce aquí en línea para no introducir una dependencia
 // circular en módulos de ayuda.
-function baseRPolinomio(ramificacion: Complex[]): number {
-  const r =
+function baseRPolinomio(
+  ramificacion: Complex[],
+  alphaEstrella: Complex,
+): number {
+  const rB =
     ramificacion.length === 0
-      ? 0.85
-      : Math.max(...ramificacion.map(cAbs)) * 1.5;
+      ? 0
+      : Math.max(...ramificacion.map(cAbs));
+  const rA = Math.hypot(alphaEstrella[0], alphaEstrella[1]);
+  const r = Math.max(rB, rA) * 1.5;
   return Math.max(r, 0.6);
 }
 
@@ -82,12 +87,15 @@ function computarMundo(
   baseRFijo: number,
   altRFijo: number,
 ): { baseR: number; altR: number } {
-  // Cubo fijo en función del polinomio. Si el lazo se sale, las
-  // curvas se ven fuera, pero la cámara no se reorienta — el
-  // rescalado continuo del cubo durante el drag resulta mareante.
+  // Cap relativo: el cubo nunca queda más de un 60 % más alto que
+  // ancho, para que polinomios donde las raíces crecen como
+  // |α|^{1/n} (p.ej. x^4 − α) no acaben con una caja desproporcionada
+  // hacia arriba.
+  const baseR = Math.max(baseRFijo * 1.15, 0.6);
+  const altCap = baseR * 1.6;
   return {
-    baseR: Math.max(baseRFijo * 1.15, 0.6),
-    altR: Math.max(altRFijo * 1.15, 1.2),
+    baseR,
+    altR: Math.max(Math.min(altRFijo * 1.15, altCap), 1.0),
   };
 }
 
@@ -115,7 +123,10 @@ export function Trayectorias3D({
   // duplicar la lógica de proyección.
   const projectedRef = useRef<Array<{ k: number; sx: number; sy: number; depth: number }>>([]);
 
-  const baseRFijo = useMemo(() => baseRPolinomio(ramificacion), [ramificacion]);
+  const baseRFijo = useMemo(
+    () => baseRPolinomio(ramificacion, alphaEstrella),
+    [ramificacion, alphaEstrella],
+  );
   // Sonda de raíces sobre una rejilla del plano α al cargar la
   // página: ~30 evaluaciones de Durand-Kerner, gratis. Da el rango
   // natural de h(x_k) que el lazo ampliará después si hace falta.
@@ -247,13 +258,18 @@ export function Trayectorias3D({
     }
     ctx.globalAlpha = 1;
 
-    // α* en la base como marcador discreto
+    // α* en la base como triángulo negro (mismo estilo que en el
+    // plano α 2D, así el ojo lo asocia entre las dos vistas).
     {
       const p = proj([alphaEstrella[0], alphaEstrella[1], 0]);
       if (p) {
-        ctx.fillStyle = '#999';
+        const r = 6;
+        ctx.fillStyle = '#000';
         ctx.beginPath();
-        ctx.arc(p.sx, p.sy, 2.5, 0, 2 * Math.PI);
+        ctx.moveTo(p.sx, p.sy - r);
+        ctx.lineTo(p.sx - r * 0.866, p.sy + r * 0.5);
+        ctx.lineTo(p.sx + r * 0.866, p.sy + r * 0.5);
+        ctx.closePath();
         ctx.fill();
       }
     }

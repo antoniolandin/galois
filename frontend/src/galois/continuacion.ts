@@ -9,8 +9,10 @@ import { cAdd, cSub, cMul, cDiv, cNeg, cAbs } from './complex';
 import { P, Px, Pa } from './polinomio';
 
 function eulerStep(x_k: Complex, alpha_k: Complex, alpha_kp1: Complex): Complex {
-  // dx/dα = -P_α / P_x
-  const dx_da = cNeg(cDiv(Pa(), Px(x_k)));
+  // dx/dα = -P_α / P_x  (ambas derivadas dependen de (x, α) en
+  // general; antes el polinomio era x⁵-x+α y P_x y P_α eran
+  // independientes de α, por eso se evaluaban sin pasarlo).
+  const dx_da = cNeg(cDiv(Pa(x_k, alpha_k), Px(x_k, alpha_k)));
   const da = cSub(alpha_kp1, alpha_k);
   return cAdd(x_k, cMul(dx_da, da));
 }
@@ -25,7 +27,7 @@ function newtonCorrect(
   for (let i = 0; i < maxIter; i++) {
     const pv = P(x, alpha);
     if (cAbs(pv) < tol) return x;
-    const der = Px(x);
+    const der = Px(x, alpha);
     if (cAbs(der) < 1e-15) break; // raíz doble: imposible continuar
     x = cSub(x, cDiv(pv, der));
   }

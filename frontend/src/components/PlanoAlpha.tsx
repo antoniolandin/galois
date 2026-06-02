@@ -80,15 +80,20 @@ export function PlanoAlpha({
   const [lazo, setLazo] = useState<Complex[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
-  // RANGE = 2 · (radio máximo de los puntos de ramificación). Así los
-  // puntos de ramificación se sitúan a la mitad del eje, cualquiera
-  // que sea el polinomio.  Si no hay ramificación (caso degenerado),
-  // se cae a 0.85 que era el valor previo fijo.
+  // RANGE = 2 · max(|ramif|, |α*|). Considerar α* hace que cuando
+  // la ramificación cae sobre el origen (p.ej. x^4 − α tiene B = {0})
+  // y el backend ha movido α* fuera del cinturón, el punto base
+  // siga estando dentro del canvas. Mínimo absoluto de 0.85 para que
+  // el plano nunca colapse a un punto.
   const RANGE = useMemo(() => {
-    if (ramificacion.length === 0) return 0.85;
-    const maxR = Math.max(...ramificacion.map(cAbs));
-    return maxR * 2;
-  }, [ramificacion]);
+    let maxR =
+      ramificacion.length === 0
+        ? 0
+        : Math.max(...ramificacion.map(cAbs));
+    const alphaR = cAbs(alphaEstrella);
+    if (alphaR > maxR) maxR = alphaR;
+    return maxR > 0.4 ? maxR * 2 : 0.85;
+  }, [ramificacion, alphaEstrella]);
 
   const canvasToAlpha = (px: number, py: number, w: number, h: number): Complex => [
     (px / w) * (2 * RANGE) - RANGE,

@@ -52,6 +52,25 @@ export async function getPolinomio(): Promise<PolinomioInfo> {
   return r.json();
 }
 
+export async function postPolinomio(expresion: string): Promise<PolinomioInfo> {
+  const r = await fetch('/api/polinomio', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expresion }),
+  });
+  if (!r.ok) {
+    let detail = `POST /api/polinomio: ${r.status}`;
+    try {
+      const j = (await r.json()) as { detail?: string };
+      if (j.detail) detail = j.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return r.json();
+}
+
 export interface GrupoObjetivo {
   estructura: string;
   orden: number;
