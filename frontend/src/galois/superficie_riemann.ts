@@ -41,7 +41,7 @@ export interface MallaRiemann {
 // para α fijo.  Las raíces iniciales (`guess`) deben estar bien
 // separadas; al usar INITIAL_ROOTS = {0, 1, -1, i, -i} de partida
 // la convergencia es rápida (3–10 iteraciones).
-function durandKerner(
+export function durandKerner(
   alpha: Complex,
   guess: Complex[],
   maxIter = 60,
@@ -95,6 +95,39 @@ function reordenarPorProximidad(rs: Complex[]): Complex[] {
     tomada[j] = true;
   }
   return ordenadas;
+}
+
+/**
+ * Sonda barata para estimar el rango de altura `h(x) = Re(x) + ½ Im(x)`
+ * que toman las raíces de P(x, α) en el entorno de los puntos de
+ * ramificación.
+ *
+ * Muestrea una rejilla 5×5 dentro del disco |α| ≤ baseR/1.5 — es
+ * decir, alrededor del cinturón natural de ramificación, sin incluir
+ * las esquinas del cuadrado del cubo. Las esquinas estarían
+ * demasiado lejos del polinomio y producirían raíces de módulo
+ * grande que inflarían el cubo de visualización innecesariamente.
+ */
+export function altMaxPolinomio(baseR: number): number {
+  const radio = baseR / 1.5;
+  const muestras: Complex[] = [];
+  const N = 5;
+  for (let i = 0; i < N; i++) {
+    const ax = -radio + (2 * radio * i) / (N - 1);
+    for (let j = 0; j < N; j++) {
+      const ay = -radio + (2 * radio * j) / (N - 1);
+      muestras.push([ax, ay]);
+    }
+  }
+  let maxH = 0;
+  for (const a of muestras) {
+    const rs = durandKerner(a, INITIAL_ROOTS as unknown as Complex[]);
+    for (const r of rs) {
+      const h = Math.abs(r[0] + 0.5 * r[1]);
+      if (h > maxH) maxH = h;
+    }
+  }
+  return maxH;
 }
 
 export function computarMallaRiemann(N: number, baseR: number): MallaRiemann {

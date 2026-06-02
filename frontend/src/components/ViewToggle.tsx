@@ -5,28 +5,30 @@ interface Props {
   onChange: (v: View) => void;
 }
 
+// Toggle de las tres vistas del viewport central. Devuelve sólo el
+// grupo de botones; el wrapper `.viewport-overlay` con la posición
+// absoluta vive en `App` para poder yuxtaponerle a la derecha el
+// toggle de cámara (sólo visible en las vistas 3D).
 export function ViewToggle({ view, onChange }: Props) {
   return (
-    <div className="viewport-overlay">
-      <div className="toggle-group">
-        <div
-          className={`opt ${view === 'superficie' ? 'active' : ''}`}
-          onClick={() => onChange('superficie')}
-        >
-          Superficie
-        </div>
-        <div
-          className={`opt ${view === 'trayectorias' ? 'active' : ''}`}
-          onClick={() => onChange('trayectorias')}
-        >
-          Trayectorias
-        </div>
-        <div
-          className={`opt ${view === 'plano-x' ? 'active' : ''}`}
-          onClick={() => onChange('plano-x')}
-        >
-          Plano x
-        </div>
+    <div className="toggle-group">
+      <div
+        className={`opt ${view === 'superficie' ? 'active' : ''}`}
+        onClick={() => onChange('superficie')}
+      >
+        Superficie
+      </div>
+      <div
+        className={`opt ${view === 'trayectorias' ? 'active' : ''}`}
+        onClick={() => onChange('trayectorias')}
+      >
+        Trayectorias
+      </div>
+      <div
+        className={`opt ${view === 'plano-x' ? 'active' : ''}`}
+        onClick={() => onChange('plano-x')}
+      >
+        Plano x
       </div>
     </div>
   );

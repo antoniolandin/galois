@@ -16,6 +16,7 @@ import { PanelGrupo } from './components/PanelGrupo';
 import { SuperficieRiemann } from './components/SuperficieRiemann';
 import { Trayectorias3D } from './components/Trayectorias3D';
 import { ViewToggle, type View } from './components/ViewToggle';
+import { CameraToggle, type CameraMode } from './components/CameraToggle';
 
 // Un generador guardado lleva consigo todo el contexto visual que se
 // usó para descubrirlo: el trazo del plano α, las trayectorias de
@@ -34,6 +35,10 @@ export default function App() {
   const [polinomio, setPolinomio] = useState<PolinomioInfo | null>(null);
   const [mode, setMode] = useState<Mode>('manual');
   const [view, setView] = useState<View>('plano-x');
+  const [cameraMode, setCameraMode] = useState<CameraMode>('orbital');
+  // Índice de la raíz desde la que se mira en POV. De momento fija
+  // a 0; cuando haya selector de raíz, este state se actualizará.
+  const povIdx = 0;
 
   const [currentAlpha, setCurrentAlpha] = useState<Complex>([0, 0]);
   const [currentRoots, setCurrentRoots] = useState<Complex[]>([...INITIAL_ROOTS]);
@@ -248,6 +253,14 @@ export default function App() {
   const displayTrayectorias: Complex[][] = selectedGen
     ? selectedGen.trayectorias
     : trayectorias;
+  // Posición de α que se renderiza en las vistas 3D. Al seleccionar
+  // un generador, las raíces mostradas son las del FINAL del lazo,
+  // así que la α también debe ser la del último punto del lazo —de
+  // lo contrario, la cámara POV (que se ancla a la raíz) sigue
+  // pegada al α live y no acompaña al snapshot del generador.
+  const displayAlpha: Complex = selectedGen
+    ? selectedGen.lazo[selectedGen.lazo.length - 1] ?? selectedGen.startAlpha
+    : currentAlpha;
 
   return (
     <div className="app">
@@ -298,7 +311,19 @@ export default function App() {
 
         {/* --- Columna 2: viewport --- */}
         <div className="panel col-viewport">
-          <ViewToggle view={view} onChange={setView} />
+          <div className="viewport-overlay">
+            <ViewToggle view={view} onChange={setView} />
+            {view === 'superficie' && (
+              <>
+                <div style={{ flex: 1 }} />
+                <CameraToggle
+                  mode={cameraMode}
+                  povIdx={povIdx}
+                  onChange={setCameraMode}
+                />
+              </>
+            )}
+          </div>
           {view === 'plano-x' ? (
             <PlanoX
               roots={displayRoots}
@@ -309,7 +334,7 @@ export default function App() {
             <Trayectorias3D
               ramificacion={ramificacion}
               alphaEstrella={alphaEstrella}
-              currentAlpha={currentAlpha}
+              currentAlpha={displayAlpha}
               lazo={displayLazo ?? liveLazo}
               trayectorias={displayTrayectorias}
               startRoots={displayStartRoots}
@@ -318,11 +343,13 @@ export default function App() {
           ) : (
             <SuperficieRiemann
               ramificacion={ramificacion}
-              currentAlpha={currentAlpha}
+              currentAlpha={displayAlpha}
               roots={displayRoots}
               lazo={displayLazo ?? liveLazo}
               trayectorias={displayTrayectorias}
               startRoots={displayStartRoots}
+              cameraMode={cameraMode}
+              povIdx={povIdx}
             />
           )}
         </div>

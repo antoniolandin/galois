@@ -36,6 +36,7 @@ import {
   type CamState,
   type Vec3,
 } from '../galois/proyeccion3d';
+import { altMaxPolinomio } from '../galois/superficie_riemann';
 
 interface Props {
   ramificacion: Complex[];
@@ -58,19 +59,31 @@ const GRID_COLOR = '#e4e4e6';
 const AXIS_COLOR = '#bfbfc2';
 const BOX_COLOR = '#d8d8db';
 
-// Tamaños canónicos del mundo. El radio base se ajusta al polinomio
-// (igual que el plano α 2D), la altura se fija a 1.2 que cubre con
-// margen el rango de Re(x_k) en las raíces iniciales y los puntos
-// de ramificación del polinomio canónico.
-function computarMundo(ramificacion: Complex[]): {
-  baseR: number;
-  altR: number;
-} {
+// Tamaños del cubo. Se ajustan al bounding box real de los datos
+// (ramificación + lazo activo + trayectorias + raíces actuales)
+// para que nunca queden segmentos del lazo fuera de la caja
+// wireframe. La función altura `h(x) = Re(x) + ½ Im(x)` se
+// reproduce aquí en línea para no introducir una dependencia
+// circular en módulos de ayuda.
+function baseRPolinomio(ramificacion: Complex[]): number {
   const r =
     ramificacion.length === 0
       ? 0.85
       : Math.max(...ramificacion.map(cAbs)) * 1.5;
-  return { baseR: Math.max(r, 0.6), altR: 1.2 };
+  return Math.max(r, 0.6);
+}
+
+function computarMundo(
+  baseRFijo: number,
+  altRFijo: number,
+): { baseR: number; altR: number } {
+  // Cubo fijo en función del polinomio. Si el lazo se sale, las
+  // curvas se ven fuera, pero la cámara no se reorienta — el
+  // rescalado continuo del cubo durante el drag resulta mareante.
+  return {
+    baseR: Math.max(baseRFijo * 1.15, 0.6),
+    altR: Math.max(altRFijo * 1.15, 1.2),
+  };
 }
 
 export function Trayectorias3D({
@@ -96,7 +109,15 @@ export function Trayectorias3D({
   // duplicar la lógica de proyección.
   const projectedRef = useRef<Array<{ k: number; sx: number; sy: number; depth: number }>>([]);
 
-  const mundo = useMemo(() => computarMundo(ramificacion), [ramificacion]);
+  const baseRFijo = useMemo(() => baseRPolinomio(ramificacion), [ramificacion]);
+  // Sonda de raíces sobre una rejilla del plano α al cargar la
+  // página: ~30 evaluaciones de Durand-Kerner, gratis. Da el rango
+  // natural de h(x_k) que el lazo ampliará después si hace falta.
+  const altRFijo = useMemo(() => altMaxPolinomio(baseRFijo), [baseRFijo]);
+  const mundo = useMemo(
+    () => computarMundo(baseRFijo, altRFijo),
+    [baseRFijo, altRFijo],
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
