@@ -273,9 +273,7 @@ export function LatticeView({ lattice }: Props) {
               if (!p) return null;
               const x = p.x * scale + pan.x + 12;
               const y = p.y * scale + pan.y - 8;
-              const text = `${formatEstructura(hoveredNode.estructura)} (orden ${hoveredNode.orden})${
-                hoveredNode.tam_clase > 1 ? ` · ${hoveredNode.tam_clase} conjugados` : ''
-              }`;
+              const text = `${formatEstructura(hoveredNode.estructura)} (orden ${hoveredNode.orden})`;
               return (
                 <g style={{ pointerEvents: 'none' }}>
                   <rect
