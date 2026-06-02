@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Layout A — Plano α grande, panel derecho compacto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link
+  href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+  rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --font-ui:   "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-math: "Fira Code", "SF Mono", Consolas, monospace;
+  }
+  body {
+    font-family: var(--font-ui);
+    background: #f3f3f5;
+    color: #2c2c2c;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+
+  /* ============ HEADER (solo título + ayuda) ============ */
+  .header {
+    display: flex; align-items: center; padding: 0 20px;
+    background: #fff; border-bottom: 1px solid #e0e0e0; gap: 20px;
+  }
+  .header h1 { font-size: 15px; font-weight: 500; color: #1a1a1a; }
+  .header .hint {
+    margin-left: auto;
+    font-size: 12px; color: #aaa;
+  }
+
+  /* ============ MAIN GRID ============ */
+  .main {
+    display: grid;
+    grid-template-columns: 320px 1fr 280px;
+    gap: 1px;
+    background: #e0e0e0;
+    overflow: hidden;
+  }
+  .panel { background: #fff; padding: 18px; overflow: auto; }
+  .panel-label {
+    font-size: 12px; font-weight: 600; color: #888; margin-bottom: 10px;
+  }
+  .panel-label .var { font-family: var(--font-math); }
+
+  /* ============ COLUMNA 1: PLANO α grande ============ */
+  /* Plano α ocupa todo el alto disponible (sin hueco vertical
+     muerto). Los botones quedan pegados debajo del canvas. */
+  .col-alpha { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .mode-selector {
+    display: flex; width: 100%; flex-shrink: 0;
+    background: #fff; border: 1px solid #d8d8d8; border-radius: 6px;
+    overflow: hidden; min-height: 38px;
+  }
+  .mode-selector .mode {
+    flex: 1; padding: 9px 6px; font-size: 13px; font-weight: 500;
+    color: #555; background: transparent; border: none;
+    border-right: 1px solid #e0e0e0; cursor: pointer; font-family: inherit;
+  }
+  .mode-selector .mode:last-child { border-right: none; }
+  .mode-selector .mode.active { background: #1a1a1a; color: #fff; }
+  .canvas-alpha {
+    flex: 1 1 0;
+    min-height: 0;
+    aspect-ratio: 1;
+    width: 100%;
+    align-self: center;
+    max-height: calc(100vh - 56px - 18px - 38px - 12px - 38px - 18px - 18px);
+    background: #fafafa;
+    border: 1px dashed #d0d0d0;
+    border-radius: 4px;
+    cursor: crosshair;
+    position: relative;
+  }
+  /* dibujito esquemático del plano alpha */
+  .canvas-alpha::before, .canvas-alpha::after {
+    content: ""; position: absolute; background: #e8e8eb;
+  }
+  .canvas-alpha::before { left: 0; right: 0; top: 50%; height: 1px; }
+  .canvas-alpha::after  { top: 0; bottom: 0; left: 50%; width: 1px; }
+  .canvas-alpha .branch {
+    position: absolute; width: 14px; height: 14px; border-radius: 50%;
+    background: #D55E00; opacity: 0.4; border: 1px solid #1a1a1a;
+    transform: translate(-50%, -50%);
+  }
+  .canvas-alpha .base {
+    position: absolute; width: 0; height: 0; transform: translate(-50%, -50%);
+    border-left: 7px solid transparent; border-right: 7px solid transparent;
+    border-bottom: 12px solid #000;
+  }
+  .controls { display: flex; gap: 8px; flex-shrink: 0; }
+  .btn {
+    flex: 1; padding: 9px 12px; border: 1px solid #d0d0d0;
+    background: #fff; border-radius: 4px; font-size: 13px; color: #333;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn:disabled { opacity: 0.5; }
+
+  /* ============ COLUMNA 2: VIEWPORT (3D) ============ */
+  .col-viewport {
+    padding: 0;
+    position: relative;
+    background: radial-gradient(circle at 50% 55%, #ffffff 0%, #f4f4f6 60%, #ececef 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .viewport-overlay {
+    position: absolute; top: 14px; left: 14px; right: 14px;
+    display: flex; gap: 16px; z-index: 10; pointer-events: none;
+  }
+  .toggle-group {
+    display: flex; background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #d8d8d8; border-radius: 6px; overflow: hidden;
+    pointer-events: auto; backdrop-filter: blur(4px);
+  }
+  .toggle-group .opt {
+    padding: 7px 14px; font-size: 12px; cursor: pointer; color: #555;
+    border-right: 1px solid #e0e0e0; display: flex; align-items: center;
+  }
+  .toggle-group .opt:last-child { border-right: none; }
+  .toggle-group .opt.active { background: #1a1a1a; color: #fff; }
+  .canvas-x {
+    background: #ffffff; border: 1px solid #d8d8d8; border-radius: 4px;
+    width: min(70vh, calc(100% - 32px)); aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    color: #ccc; font-size: 80px;
+  }
+  .camera-toggle-btn {
+    position: absolute; bottom: 14px; right: 14px;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.94); border: 1px solid #d8d8d8;
+    color: #1a1a1a; display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+  }
+
+  /* ============ COLUMNA 3: PANEL SUBGRUPO compacto ============ */
+  /* Estructura + Orden en UNA sola fila para ahorrar vertical.
+     El polinomio del header se mueve aquí (debajo del label).
+     Generadores con altura fija razonable. Retículo más alto. */
+  .col-group {
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .col-group .poly {
+    font-family: var(--font-math);
+    font-size: 12px; color: #555;
+    background: #f5f5f7; padding: 6px 10px; border-radius: 4px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  .row-estructura {
+    display: flex; align-items: baseline; gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #efefef;
+  }
+  .row-estructura .item-est { display: flex; flex-direction: column; gap: 2px; }
+  .row-estructura .item-est .lbl {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #999;
+  }
+  .row-estructura .item-est .val {
+    font-size: 18px; font-weight: 500; color: #1a1a1a;
+    font-family: var(--font-math);
+  }
+  .row-estructura .item-est .val.num { font-family: var(--font-ui); }
+  .row-estructura .sep { color: #d0d0d0; align-self: center; }
+
+  .field-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #999; margin-bottom: 6px;
+  }
+  .gens {
+    font-family: var(--font-math); font-size: 14px;
+    height: 96px; overflow-y: auto; margin-bottom: 18px;
+    border: 1px solid #f0f0f0; border-radius: 4px; padding: 4px 6px;
+  }
+  .gen { display: flex; gap: 12px; padding: 4px 4px; }
+  .gen .ix { color: #666; width: 28px; }
+  .gen .perm { color: #1a1a1a; flex: 1; }
+
+  .lattice-view {
+    flex: 1 1 0;
+    min-height: 200px;
+    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    color: #aaa; font-style: italic; font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER simple: solo título + breve ayuda. El polinomio se va al panel derecho -->
+  <div class="header">
+    <h1>Visualizador de monodromía</h1>
+    <div class="hint">Arrastra sobre el plano α para dibujar un lazo</div>
+  </div>
+
+  <div class="main">
+
+    <!-- COLUMNA 1: plano α en grande, botones pegados abajo -->
+    <div class="panel col-alpha">
+      <div class="panel-label">Modo</div>
+      <div class="mode-selector">
+        <button class="mode active">Manual</button>
+        <button class="mode">Aleatorio</button>
+        <button class="mode">Hauenstein</button>
+      </div>
+
+      <div class="panel-label">Plano de <span class="var">α</span></div>
+      <div class="canvas-alpha">
+        <span class="branch" style="left:75%;top:50%"></span>
+        <span class="branch" style="left:50%;top:75%"></span>
+        <span class="branch" style="left:25%;top:50%"></span>
+        <span class="branch" style="left:50%;top:25%"></span>
+        <span class="base" style="left:50%;top:50%"></span>
+      </div>
+
+      <div class="controls">
+        <button class="btn">Deshacer</button>
+        <button class="btn">Reset</button>
+      </div>
+    </div>
+
+    <!-- COLUMNA 2: viewport sin cambios respecto al actual -->
+    <div class="panel col-viewport">
+      <div class="viewport-overlay">
+        <div class="toggle-group">
+          <div class="opt active">Superficie</div>
+          <div class="opt">Trayectorias</div>
+          <div class="opt">Plano x</div>
+        </div>
+      </div>
+      <div class="canvas-x">◐</div>
+      <button class="camera-toggle-btn">📷</button>
+    </div>
+
+    <!-- COLUMNA 3: panel del subgrupo COMPACTO -->
+    <div class="panel col-group">
+      <div class="panel-label">Subgrupo descubierto</div>
+      <!-- el polinomio se sitúa al inicio del panel, asociado
+           visualmente al subgrupo que se está descubriendo -->
+      <div class="poly">P(x, α) = x⁵ − x + α</div>
+
+      <!-- Estructura + Orden en una sola fila -->
+      <div class="row-estructura">
+        <div class="item-est">
+          <div class="lbl">Estructura</div>
+          <div class="val">S₄</div>
+        </div>
+        <div class="sep">·</div>
+        <div class="item-est">
+          <div class="lbl">Orden</div>
+          <div class="val num">24</div>
+        </div>
+      </div>
+
+      <div class="field-label">Generadores</div>
+      <div class="gens">
+        <div class="gen"><span class="ix">σ₁</span><span class="perm">(0 2)</span></div>
+        <div class="gen"><span class="ix">σ₂</span><span class="perm">(0 1)</span></div>
+        <div class="gen"><span class="ix">σ₃</span><span class="perm">(0 4)</span></div>
+      </div>
+
+      <div class="field-label">Retículo de subgrupos</div>
+      <div class="lattice-view">(retículo: ocupa todo el alto restante)</div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

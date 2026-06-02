@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Layout B — Stats flotando sobre el visor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link
+  href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+  rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --font-ui:   "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-math: "Fira Code", "SF Mono", Consolas, monospace;
+  }
+  body {
+    font-family: var(--font-ui);
+    background: #f3f3f5;
+    color: #2c2c2c;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+
+  /* ============ HEADER ============ */
+  /* Igual que el actual: título + polinomio a la derecha. */
+  .header {
+    display: flex; align-items: center; padding: 0 20px;
+    background: #fff; border-bottom: 1px solid #e0e0e0; gap: 20px;
+  }
+  .header h1 { font-size: 15px; font-weight: 500; color: #1a1a1a; }
+  .header .poly {
+    margin-left: auto;
+    font-family: var(--font-math);
+    color: #555; font-size: 13px;
+    background: #f5f5f7; padding: 4px 10px; border-radius: 4px;
+  }
+
+  /* ============ MAIN GRID ============ */
+  .main {
+    display: grid;
+    grid-template-columns: 320px 1fr 280px;
+    gap: 1px; background: #e0e0e0; overflow: hidden;
+  }
+  .panel { background: #fff; padding: 18px; overflow: auto; }
+  .panel-label {
+    font-size: 12px; font-weight: 600; color: #888; margin-bottom: 10px;
+  }
+  .panel-label .var { font-family: var(--font-math); }
+
+  /* ============ COLUMNA 1: PLANO α ============ */
+  /* Igual que A: el plano α llena la altura disponible y los
+     botones quedan pegados debajo. */
+  .col-alpha { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .mode-selector {
+    display: flex; width: 100%; flex-shrink: 0;
+    background: #fff; border: 1px solid #d8d8d8; border-radius: 6px;
+    overflow: hidden; min-height: 38px;
+  }
+  .mode-selector .mode {
+    flex: 1; padding: 9px 6px; font-size: 13px; font-weight: 500;
+    color: #555; background: transparent; border: none;
+    border-right: 1px solid #e0e0e0; cursor: pointer; font-family: inherit;
+  }
+  .mode-selector .mode:last-child { border-right: none; }
+  .mode-selector .mode.active { background: #1a1a1a; color: #fff; }
+  .canvas-alpha {
+    flex: 1 1 0;
+    min-height: 0;
+    aspect-ratio: 1;
+    width: 100%;
+    align-self: center;
+    max-height: calc(100vh - 56px - 18px - 38px - 12px - 38px - 18px - 18px);
+    background: #fafafa;
+    border: 1px dashed #d0d0d0;
+    border-radius: 4px;
+    cursor: crosshair;
+    position: relative;
+  }
+  .canvas-alpha::before, .canvas-alpha::after {
+    content: ""; position: absolute; background: #e8e8eb;
+  }
+  .canvas-alpha::before { left: 0; right: 0; top: 50%; height: 1px; }
+  .canvas-alpha::after  { top: 0; bottom: 0; left: 50%; width: 1px; }
+  .canvas-alpha .branch {
+    position: absolute; width: 14px; height: 14px; border-radius: 50%;
+    background: #D55E00; opacity: 0.4; border: 1px solid #1a1a1a;
+    transform: translate(-50%, -50%);
+  }
+  .canvas-alpha .base {
+    position: absolute; width: 0; height: 0; transform: translate(-50%, -50%);
+    border-left: 7px solid transparent; border-right: 7px solid transparent;
+    border-bottom: 12px solid #000;
+  }
+  .controls { display: flex; gap: 8px; flex-shrink: 0; }
+  .btn {
+    flex: 1; padding: 9px 12px; border: 1px solid #d0d0d0;
+    background: #fff; border-radius: 4px; font-size: 13px; color: #333;
+    cursor: pointer; font-family: inherit;
+  }
+
+  /* ============ COLUMNA 2: VIEWPORT con stats flotando ============ */
+  .col-viewport {
+    padding: 0;
+    position: relative;
+    background: radial-gradient(circle at 50% 55%, #ffffff 0%, #f4f4f6 60%, #ececef 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .viewport-overlay {
+    position: absolute; top: 14px; left: 14px; right: 14px;
+    display: flex; gap: 16px; z-index: 10; pointer-events: none;
+    align-items: center;
+  }
+  .toggle-group {
+    display: flex; background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #d8d8d8; border-radius: 6px; overflow: hidden;
+    pointer-events: auto; backdrop-filter: blur(4px);
+  }
+  .toggle-group .opt {
+    padding: 7px 14px; font-size: 12px; cursor: pointer; color: #555;
+    border-right: 1px solid #e0e0e0; display: flex; align-items: center;
+  }
+  .toggle-group .opt:last-child { border-right: none; }
+  .toggle-group .opt.active { background: #1a1a1a; color: #fff; }
+
+  /* Pills de stats que flotan sobre el viewport */
+  .stat-pills {
+    display: flex; gap: 8px;
+    margin-left: auto;
+    pointer-events: none;
+  }
+  .pill {
+    display: flex; align-items: baseline; gap: 6px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #d8d8d8;
+    border-radius: 999px;
+    font-size: 12px;
+    backdrop-filter: blur(4px);
+  }
+  .pill .lbl {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #999;
+  }
+  .pill .val { font-family: var(--font-math); color: #1a1a1a; font-size: 13px; }
+  .pill .val.num { font-family: var(--font-ui); font-weight: 500; }
+  .pill.iter .val { font-family: var(--font-ui); font-weight: 500; }
+
+  .canvas-x {
+    background: #ffffff; border: 1px solid #d8d8d8; border-radius: 4px;
+    width: min(70vh, calc(100% - 32px)); aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    color: #ccc; font-size: 80px;
+  }
+  .camera-toggle-btn {
+    position: absolute; bottom: 14px; right: 14px;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.94); border: 1px solid #d8d8d8;
+    color: #1a1a1a; display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+  }
+
+  /* ============ COLUMNA 3: PANEL solo generadores + retículo ============ */
+  /* Estructura y Orden NO viven aquí: están en las pills del viewport.
+     Lo que queda en la columna derecha son generadores y retículo,
+     que ahora pueden ocupar más alto. */
+  .col-group {
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .field-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #999; margin-bottom: 6px;
+  }
+  .gens {
+    font-family: var(--font-math); font-size: 14px;
+    height: 130px; overflow-y: auto; margin-bottom: 18px;
+    border: 1px solid #f0f0f0; border-radius: 4px; padding: 4px 6px;
+  }
+  .gen { display: flex; gap: 12px; padding: 4px 4px; }
+  .gen .ix { color: #666; width: 28px; }
+  .gen .perm { color: #1a1a1a; flex: 1; }
+
+  .lattice-view {
+    flex: 1 1 0;
+    min-height: 260px;
+    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    color: #aaa; font-style: italic; font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER tal cual el actual -->
+  <div class="header">
+    <h1>Visualizador de monodromía</h1>
+    <div class="poly">P(x, α) = x⁵ − x + α</div>
+  </div>
+
+  <div class="main">
+
+    <!-- COLUMNA 1: igual que A -->
+    <div class="panel col-alpha">
+      <div class="panel-label">Modo</div>
+      <div class="mode-selector">
+        <button class="mode active">Manual</button>
+        <button class="mode">Aleatorio</button>
+        <button class="mode">Hauenstein</button>
+      </div>
+
+      <div class="panel-label">Plano de <span class="var">α</span></div>
+      <div class="canvas-alpha">
+        <span class="branch" style="left:75%;top:50%"></span>
+        <span class="branch" style="left:50%;top:75%"></span>
+        <span class="branch" style="left:25%;top:50%"></span>
+        <span class="branch" style="left:50%;top:25%"></span>
+        <span class="base" style="left:50%;top:50%"></span>
+      </div>
+
+      <div class="controls">
+        <button class="btn">Deshacer</button>
+        <button class="btn">Reset</button>
+      </div>
+    </div>
+
+    <!-- COLUMNA 2: viewport CON pills de estructura/orden/iter flotando -->
+    <div class="panel col-viewport">
+      <div class="viewport-overlay">
+        <div class="toggle-group">
+          <div class="opt active">Superficie</div>
+          <div class="opt">Trayectorias</div>
+          <div class="opt">Plano x</div>
+        </div>
+        <div class="stat-pills">
+          <div class="pill">
+            <span class="lbl">Estructura</span>
+            <span class="val">S₄</span>
+          </div>
+          <div class="pill">
+            <span class="lbl">Orden</span>
+            <span class="val num">24</span>
+          </div>
+          <div class="pill iter">
+            <span class="lbl">Iter</span>
+            <span class="val">25</span>
+          </div>
+        </div>
+      </div>
+      <div class="canvas-x">◐</div>
+      <button class="camera-toggle-btn">📷</button>
+    </div>
+
+    <!-- COLUMNA 3: solo generadores y retículo (más espacio para ambos) -->
+    <div class="panel col-group">
+      <div class="panel-label">Subgrupo descubierto</div>
+
+      <div class="field-label">Generadores</div>
+      <div class="gens">
+        <div class="gen"><span class="ix">σ₁</span><span class="perm">(0 2)</span></div>
+        <div class="gen"><span class="ix">σ₂</span><span class="perm">(0 1)</span></div>
+        <div class="gen"><span class="ix">σ₃</span><span class="perm">(0 4)</span></div>
+      </div>
+
+      <div class="field-label">Retículo de subgrupos</div>
+      <div class="lattice-view">(retículo: ocupa todo el alto restante)</div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
