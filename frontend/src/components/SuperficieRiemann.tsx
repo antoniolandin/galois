@@ -147,6 +147,43 @@ function yawPitchHaciaPunto(
   };
 }
 
+// Hoja del mallado sobre la que se encuentra una raíz concreta en
+// el α actual. La identidad de la raíz seguida (color/canónica) es
+// estable, pero su posición sobre la superficie de Riemann cambia al
+// aplicar permutaciones: cruzar un punto de ramificación intercambia
+// los roles entre hojas. Esta función localiza la hoja del mallado
+// más próxima a la posición de la raíz para que el ancla de la
+// cámara POV siga al color y no al índice fijo de la hoja.
+function meshSheetParaRaiz(
+  malla: MallaRiemann,
+  currentAlpha: Complex,
+  rootPos: Complex,
+): number {
+  const N = malla.N;
+  const baseR = malla.baseR;
+  let i = Math.round(((currentAlpha[0] + baseR) / (2 * baseR)) * (N - 1));
+  let j = Math.round(((currentAlpha[1] + baseR) / (2 * baseR)) * (N - 1));
+  if (i < 0) i = 0;
+  else if (i >= N) i = N - 1;
+  if (j < 0) j = 0;
+  else if (j >= N) j = N - 1;
+  const sheets = malla.roots[i * N + j];
+  let best = 0;
+  let bestD = Infinity;
+  for (let k = 0; k < sheets.length; k++) {
+    const s = sheets[k];
+    if (!s) continue;
+    const dx = s[0] - rootPos[0];
+    const dy = s[1] - rootPos[1];
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = k;
+    }
+  }
+  return best;
+}
+
 // Normal local a la hoja `povIdx` en el punto del α actual.
 // La superficie es z = h(α), así que la normal (no unitaria) es
 // (-∂h/∂αx, -∂h/∂αy, 1).  Se aproxima con diferencias finitas
@@ -363,6 +400,16 @@ export function SuperficieRiemann({
     [baseRFijo],
   );
 
+  // Hoja del mallado en la que actualmente reside la raíz seguida.
+  // `povIdx` es el índice canónico (color) de la raíz; tras una
+  // permutación, esa raíz ocupa una hoja distinta de la malla. El
+  // ancla de la cámara POV debe consultar este índice dinámico.
+  const povMeshIdx = useMemo(() => {
+    const r = roots[povIdx];
+    if (!r) return povIdx;
+    return meshSheetParaRaiz(malla, currentAlpha, r);
+  }, [malla, currentAlpha, roots, povIdx]);
+
   // Cámara dinámica en POV. Cada vez que la raíz se mueve
   // (cambia `currentAlpha`), la orientación se recalcula para que
   // apunte hacia el origen del mundo desde la nueva posición. El
@@ -375,15 +422,15 @@ export function SuperficieRiemann({
   useEffect(() => {
     if (cameraMode !== 'pov') return;
     if (draggingRef.current?.kind === 'pov') return;
-    const cz = camZPOV(malla, currentAlpha, povIdx);
+    const cz = camZPOV(malla, currentAlpha, povMeshIdx);
     const camPos: Vec3 = [currentAlpha[0], currentAlpha[1], cz];
     // yaw/pitch ahora viven en el frame local de la normal de la
     // hoja; los resolvemos a partir del vector camPos → origen.
-    const up = normalEnAlpha(malla, currentAlpha, povIdx);
+    const up = normalEnAlpha(malla, currentAlpha, povMeshIdx);
     const { yaw, pitch } = yawPitchHaciaPunto([0, 0, 0], camPos, up);
     setPovYaw(yaw);
     setPovPitch(pitch);
-  }, [currentAlpha, cameraMode, malla, povIdx]);
+  }, [currentAlpha, cameraMode, malla, povMeshIdx]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -424,12 +471,12 @@ export function SuperficieRiemann({
       const camPos: Vec3 = [
         currentAlpha[0],
         currentAlpha[1],
-        camZPOV(malla, currentAlpha, povIdx),
+        camZPOV(malla, currentAlpha, povMeshIdx),
       ];
       // `worldUp` = normal local de la hoja observada. La cámara
       // se "inclina" con la superficie: cuando la hoja sube en una
       // dirección, el techo de la cámara apunta hacia esa dirección.
-      const upLocal = normalEnAlpha(malla, currentAlpha, povIdx);
+      const upLocal = normalEnAlpha(malla, currentAlpha, povMeshIdx);
       // El forward se construye en el frame local de `upLocal` para
       // que el drag (yaw/pitch) se sienta como rotar la cabeza
       // sobre la hoja: yaw siempre rota alrededor de la normal y
@@ -936,6 +983,7 @@ export function SuperficieRiemann({
     hoveredIdx,
     cameraMode,
     povIdx,
+    povMeshIdx,
     povYaw,
     povPitch,
   ]);
@@ -1023,9 +1071,9 @@ export function SuperficieRiemann({
       const camPos: Vec3 = [
         currentAlpha[0],
         currentAlpha[1],
-        camZPOV(malla, currentAlpha, povIdx),
+        camZPOV(malla, currentAlpha, povMeshIdx),
       ];
-      const up = normalEnAlpha(malla, currentAlpha, povIdx);
+      const up = normalEnAlpha(malla, currentAlpha, povMeshIdx);
       const { yaw, pitch } = yawPitchHaciaPunto([0, 0, 0], camPos, up);
       setPovYaw(yaw);
       setPovPitch(pitch);
