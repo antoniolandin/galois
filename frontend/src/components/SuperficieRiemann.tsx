@@ -320,6 +320,89 @@ function imToLevel(im: number): number {
   return lvl >= IM_NIVELES ? IM_NIVELES - 1 : lvl;
 }
 
+// Punto ya proyectado a coordenadas de canvas.
+type Pt = { sx: number; sy: number };
+
+// Triángulo de una hoja proyectado a pantalla. Los tres vértices ya
+// están en coordenadas de canvas; `depth` es la profundidad media en
+// el sistema de la cámara y se usa para ordenar el painter's.
+type Tri = {
+  kind: 'tri';
+  v0: Pt;
+  v1: Pt;
+  v2: Pt;
+  depth: number;
+  color: string;
+};
+
+// Tramo de una trayectoria: polilínea de varios puntos consecutivos
+// proyectados a pantalla. Pintar la curva tramo a tramo (en vez de
+// segmento por segmento) reduce los "trompicones" que produce la
+// intercalación con triángulos de la hoja: dentro de un tramo la
+// línea es continua; entre tramos puede haber un triángulo del
+// fondo intercalado.
+type Seg = {
+  kind: 'seg';
+  pts: Pt[];
+  depth: number;
+  color: string;
+};
+
+// Pinta un triángulo opaco. No se hace `stroke()` extra: los
+// micro-gaps por antialias quedan disimulados porque los triángulos
+// vecinos suelen ser del mismo tono modulado.
+function pintarTriangulo(ctx: CanvasRenderingContext2D, t: Tri): void {
+  ctx.fillStyle = t.color;
+  ctx.beginPath();
+  ctx.moveTo(t.v0.sx, t.v0.sy);
+  ctx.lineTo(t.v1.sx, t.v1.sy);
+  ctx.lineTo(t.v2.sx, t.v2.sy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Pinta un tramo de trayectoria con halo blanco y trazo de color
+// encima. La curva queda visualmente continua dentro del tramo.
+function pintarSegmento(ctx: CanvasRenderingContext2D, s: Seg): void {
+  if (s.pts.length < 2) return;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(s.pts[0].sx, s.pts[0].sy);
+  for (let q = 1; q < s.pts.length; q++) {
+    ctx.lineTo(s.pts[q].sx, s.pts[q].sy);
+  }
+  ctx.strokeStyle = '#ffffff';
+  ctx.globalAlpha = 0.8;
+  ctx.lineWidth = 5.2;
+  ctx.stroke();
+  ctx.strokeStyle = s.color;
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 2.4;
+  ctx.stroke();
+}
+
+/**
+ * Algoritmo del pintor: ordena los elementos por profundidad media
+ * descendente y los pinta de atrás hacia delante, de modo que cada
+ * elemento cubre los anteriores. Sustituye al z-buffer que tendría
+ * una API 3D del navegador.
+ */
+function pintarPorProfundidad(
+  ctx: CanvasRenderingContext2D,
+  items: Array<Tri | Seg>,
+): void {
+  items.sort((a, b) => b.depth - a.depth);
+  ctx.globalAlpha = 1;
+  for (const it of items) {
+    if (it.kind === 'tri') {
+      pintarTriangulo(ctx, it);
+    } else {
+      pintarSegmento(ctx, it);
+    }
+  }
+}
+
 // `baseR` "fijo" del polinomio para la malla precomputada. Se
 // dimensiona con un factor 2.5 × max |ramif| (más generoso que el
 // del cubo orbital, factor 1.5) precisamente para que cualquier
@@ -569,26 +652,6 @@ export function SuperficieRiemann({
       // colección ordenada por profundidad permite que las
       // trayectorias se oculten correctamente cuando pasan detrás de
       // una hoja.
-      type Tri = {
-        kind: 'tri';
-        v0: { sx: number; sy: number };
-        v1: { sx: number; sy: number };
-        v2: { sx: number; sy: number };
-        depth: number;
-        color: string;
-      };
-      // Un "Seg" es un tramo del lazo: una polilínea con varios
-      // puntos consecutivos. Pintar la curva tramo a tramo (en vez
-      // de segmento por segmento) reduce los "trompicones" que
-      // produce la intercalación con triángulos de la hoja: dentro
-      // de un tramo la línea es continua; entre tramos puede haber
-      // un triángulo del fondo intercalado.
-      type Seg = {
-        kind: 'seg';
-        pts: Array<{ sx: number; sy: number }>;
-        depth: number;
-        color: string;
-      };
       const items: Array<Tri | Seg> = [];
       // Comparación al cuadrado para evitar sqrt en el descarte.
       const umbralC2 = umbralC * umbralC;
@@ -745,45 +808,7 @@ export function SuperficieRiemann({
         }
       }
 
-      items.sort((a, b) => b.depth - a.depth);
-      ctx.globalAlpha = 1;
-      // Triángulos sin `stroke()` extra: el coste por triángulo se
-      // reduce a casi la mitad y los micro-gaps por antialias quedan
-      // disimulados porque los triángulos vecinos ya no son de
-      // colores totalmente distintos sino del mismo tono modulado.
-      for (let t = 0; t < items.length; t++) {
-        const it = items[t];
-        if (it.kind === 'tri') {
-          ctx.fillStyle = it.color;
-          ctx.beginPath();
-          ctx.moveTo(it.v0.sx, it.v0.sy);
-          ctx.lineTo(it.v1.sx, it.v1.sy);
-          ctx.lineTo(it.v2.sx, it.v2.sy);
-          ctx.closePath();
-          ctx.fill();
-        } else {
-          // Tramo: polilínea con halo blanco + trazo de color.
-          // Una sola Path2D por tramo para que la curva quede
-          // visualmente continua dentro de él, aunque los tramos
-          // sigan respetando la oclusión con los triángulos.
-          if (it.pts.length < 2) continue;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.beginPath();
-          ctx.moveTo(it.pts[0].sx, it.pts[0].sy);
-          for (let q = 1; q < it.pts.length; q++) {
-            ctx.lineTo(it.pts[q].sx, it.pts[q].sy);
-          }
-          ctx.strokeStyle = '#ffffff';
-          ctx.globalAlpha = 0.8;
-          ctx.lineWidth = 5.2;
-          ctx.stroke();
-          ctx.strokeStyle = it.color;
-          ctx.globalAlpha = 1;
-          ctx.lineWidth = 2.4;
-          ctx.stroke();
-        }
-      }
+      pintarPorProfundidad(ctx, items);
       // Segunda pasada de tramos como "fantasma" sobre toda la
       // geometría: aunque la hoja del observador o una vecina
       // tapen el lazo en el painter's principal, el fantasma se
