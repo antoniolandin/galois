@@ -27,7 +27,10 @@ import { Trayectorias3D } from './components/Trayectorias3D';
 import { ViewToggle, type View } from './components/ViewToggle';
 import { CameraToggle, type CameraMode } from './components/CameraToggle';
 import { StatsPills } from './components/StatsPills';
+import { StauduharPage } from './components/StauduharPage';
 import { DEFAULT_CAM, type CamState } from './galois/proyeccion3d';
+
+type PageView = 'monodromia' | 'stauduhar';
 
 // Un generador guardado lleva consigo todo el contexto visual que se
 // usó para descubrirlo: el trazo del plano α, las trayectorias de
@@ -43,6 +46,11 @@ export interface GeneradorGuardado {
 }
 
 export default function App() {
+  // Toggle de vista a nivel raiz: monodromia (la app original sobre
+  // C(alpha)) o stauduhar (cuerpos de numeros, descenso clasico).
+  // Stauduhar no necesita el estado paramétrico, por eso se monta
+  // antes de pedir el polinomio al backend.
+  const [pageView, setPageView] = useState<PageView>('monodromia');
   const [polinomio, setPolinomio] = useState<PolinomioInfo | null>(null);
   // Overlay de loading durante el cambio de polinomio: tapamos la
   // app mientras el backend recalcula (grupo de Galois, ramif…) y
@@ -818,6 +826,10 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [mode, handleDeshacer, handleEscape, generadores.length]);
 
+  if (pageView === 'stauduhar') {
+    return <StauduharPage onBack={() => setPageView('monodromia')} />;
+  }
+
   if (!polinomio) {
     return (
       <div className="app">
@@ -878,6 +890,7 @@ export default function App() {
       <Header
         expresion={polinomio.expresion}
         onChangeExpresion={handleChangeExpresion}
+        onGoToStauduhar={() => setPageView('stauduhar')}
       />
       <div className="main" key={polinomioKey}>
         {/* --- Columna 1: plano α --- */}

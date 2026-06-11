@@ -116,3 +116,66 @@ export async function postPermutacion(
   if (!r.ok) throw new Error(`POST /api/permutacion: ${r.status}`);
   return r.json();
 }
+
+// -- Stauduhar (grado 3 a 5 sobre Q) -------------------------------
+
+export interface CosetApp {
+  idx: number;
+  representante_latex: string;
+  representante_cycle: number[][];
+  conjugado_y_latex: string;
+  conjugado_alpha_latex: string;
+  valor_numerico_latex: string;
+  valor_es_entero: boolean;
+}
+
+export interface CandidatoProbado {
+  subgrupo_latex: string;
+  subgrupo_orden: number;
+  indice: number;
+  invariante_y_latex: string;
+  invariante_descripcion: string;
+  cosets: CosetApp[];
+  Q_latex: string;
+  Q_factorizacion_latex: string;
+  raices_enteras_simples: string[];
+  descender_a: string | null;
+  coset_descenso_idx: number | null;
+  razon: string;
+}
+
+export interface NivelDescenso {
+  grupo_actual_latex: string;
+  grupo_actual_orden: number;
+  candidatos: CandidatoProbado[];
+  descender_a: string | null;
+}
+
+export interface StauduharResponse {
+  polinomio_latex: string;
+  grado: number;
+  niveles: NivelDescenso[];
+  grupo_final: string;
+}
+
+export async function postStauduhar(
+  expresion: string,
+  grado: number,
+): Promise<StauduharResponse> {
+  const r = await fetch('/api/stauduhar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expresion, grado }),
+  });
+  if (!r.ok) {
+    let detail = `POST /api/stauduhar: ${r.status}`;
+    try {
+      const j = (await r.json()) as { detail?: string };
+      if (j.detail) detail = j.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return r.json();
+}

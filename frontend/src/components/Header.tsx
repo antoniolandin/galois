@@ -6,6 +6,8 @@ interface Props {
   // promesa rechaza, el header muestra el mensaje y mantiene el
   // input abierto para que el usuario lo corrija.
   onChangeExpresion?: (expresion: string) => Promise<void>;
+  // Callback para cambiar a la vista de Stauduhar (cuerpos de numeros).
+  onGoToStauduhar?: () => void;
 }
 
 // Sympy nos da expresiones tipo "alpha + x**5 - x" en un orden arbitrario.
@@ -83,7 +85,7 @@ function validar(
   return { ok: true, expr: norm };
 }
 
-export function Header({ expresion, onChangeExpresion }: Props) {
+export function Header({ expresion, onChangeExpresion, onGoToStauduhar }: Props) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -171,6 +173,15 @@ export function Header({ expresion, onChangeExpresion }: Props) {
           P(x, α) = {pretty(expresion)}
         </span>
       ) : null}
+      {onGoToStauduhar && (
+        <button
+          className="btn-stauduhar"
+          onClick={onGoToStauduhar}
+          title="Modo Stauduhar sobre cuerpos de números"
+        >
+          Stauduhar →
+        </button>
+      )}
     </header>
   );
 }
