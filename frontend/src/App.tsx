@@ -32,6 +32,12 @@ import { DEFAULT_CAM, type CamState } from './galois/proyeccion3d';
 
 type PageView = 'monodromia' | 'stauduhar';
 
+function pageDeUrl(): PageView {
+  return window.location.pathname.startsWith('/stauduhar')
+    ? 'stauduhar'
+    : 'monodromia';
+}
+
 // Un generador guardado lleva consigo todo el contexto visual que se
 // usó para descubrirlo: el trazo del plano α, las trayectorias de
 // las raíces, y las posiciones de inicio y final.  Así al pinchar
@@ -50,7 +56,22 @@ export default function App() {
   // C(alpha)) o stauduhar (cuerpos de numeros, descenso clasico).
   // Stauduhar no necesita el estado paramétrico, por eso se monta
   // antes de pedir el polinomio al backend.
-  const [pageView, setPageView] = useState<PageView>('monodromia');
+  const [pageView, setPageView] = useState<PageView>(pageDeUrl());
+
+  // Sincroniza pageView <-> URL para que /monodromia y /stauduhar
+  // sean bookmarkeables y la recarga no devuelva siempre al primero.
+  useEffect(() => {
+    const path = pageView === 'stauduhar' ? '/stauduhar' : '/monodromia';
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+  }, [pageView]);
+  useEffect(() => {
+    function onPop() { setPageView(pageDeUrl()); }
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   const [polinomio, setPolinomio] = useState<PolinomioInfo | null>(null);
   // Overlay de loading durante el cambio de polinomio: tapamos la
   // app mientras el backend recalcula (grupo de Galois, ramif…) y
