@@ -118,6 +118,13 @@ function diffPosicionesAlpha(oldLatex: string, newLatex: string): Set<number> {
 
 // Render Fira Code para nombres de grupo: "S_4", "D_4", "F_{20}",
 // "A_5", "PGL_2(F_5)", etc. No colorea (no son raices).
+// Convierte un nombre de grupo "F_20" en LaTeX que KaTeX renderiza
+// con el subíndice completo: "F_{20}". Sin esto, KaTeX solo coge el
+// primer carácter del subíndice ("F_2") y deja el resto suelto.
+function texGrupo(nombre: string): string {
+  return nombre.replace(/_(\d+)/, '_{$1}');
+}
+
 function renderGroupName(latex: string): JSX.Element {
   const s = latex
     .replace(/\\mathrm\{([^}]+)\}/g, '$1')
@@ -1161,16 +1168,16 @@ export function StauduharPage({ onBack }: Props) {
                               <Tex tex={preColoreLatex(valor)} />, aportada por{' '}
                               <Tex tex={`\\pi_{${(cidx ?? 0) + 1}} = ${cosetRepr}`} />.
                               Luego{' '}
-                              <Tex tex={`\\mathrm{Gal}(f) \\subseteq ${candActual.descender_a}`} />.
+                              <Tex tex={`\\mathrm{Gal}(f) \\subseteq ${texGrupo(candActual.descender_a)}`} />.
                             </p>
                             {descensoTerminado ? (
                               <p style={{ marginTop: 8 }}>
                                 El catálogo no incluye resolventes para
                                 descender desde{' '}
-                                <Tex tex={candActual.descender_a!} />, así
+                                <Tex tex={texGrupo(candActual.descender_a!)} />, así
                                 que el descenso no puede continuar.
                                 El grupo de Galois podría ser{' '}
-                                <Tex tex={candActual.descender_a!} /> o
+                                <Tex tex={texGrupo(candActual.descender_a!)} /> o
                                 cualquier subgrupo transitivo contenido en él.
                               </p>
                             ) : !esUltimoNivel ? (
@@ -1199,7 +1206,7 @@ export function StauduharPage({ onBack }: Props) {
                               <strong>✗ Resolvente sin raíces enteras.</strong>{' '}
                               <Tex tex="Q(t)" /> no tiene ninguna raíz en{' '}
                               <Tex tex="\mathbb{Z}" />, luego{' '}
-                              <Tex tex={`\\mathrm{Gal}(f) \\not\\subseteq ${candActual.subgrupo_latex}`} />.
+                              <Tex tex={`\\mathrm{Gal}(f) \\not\\subseteq ${texGrupo(candActual.subgrupo_latex)}`} />.
                               Descartamos el candidato.
                             </p>
                           ) : (
@@ -1223,7 +1230,7 @@ export function StauduharPage({ onBack }: Props) {
                           ) : (
                             <p style={{ marginTop: 8 }}>
                               No quedan más candidatos en este nivel.{' '}
-                              <Tex tex={`\\mathrm{Gal}(f) = ${nivelActual.grupo_actual_latex}`} />.
+                              <Tex tex={`\\mathrm{Gal}(f) = ${texGrupo(nivelActual.grupo_actual_latex)}`} />.
                             </p>
                           )}
                         </div>
