@@ -165,6 +165,22 @@ def _valor_complejo_latex(v: complex, tol: float = 1e-8) -> str:
     return rf"{v.real:.3f} + {v.imag:.3f} i"
 
 
+def _conjugado_vandermonde_manual(p: Permutation, n: int, usar_alpha: bool) -> str:
+    """Genera el LaTeX del conjugado del invariante de Vandermonde
+        prod_{i<j} (x_i - x_j)
+    aplicando p a los indices: prod_{i<j} (x_{p(i)} - x_{p(j)}). Se
+    evita sympy para no canonizar (alpha_2 - alpha_1) a -alpha_1 + alpha_2,
+    cosa que oculta la accion clara de la permutacion."""
+    sym = r"\alpha" if usar_alpha else "y"
+    factores = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            a = p(i) + 1
+            b = p(j) + 1
+            factores.append(rf"\left({sym}_{{{a}}} - {sym}_{{{b}}}\right)")
+    return "".join(factores)
+
+
 def _es_cuadrado_en_q(q) -> bool:
     q = sp.Rational(q)
     if q < 0:
@@ -431,14 +447,13 @@ def _probar_candidato(
         valores.append(v)
         v_redondeado = round(v.real)
         es_ent = abs(v.imag) < 1e-4 and abs(v.real - v_redondeado) < 1e-4
-        # Para Vandermonde devolvemos notacion compacta: el conjugado
-        # de \delta bajo una permutacion es +\delta o -\delta segun
-        # la paridad de la permutacion (van der Waerden).
+        # Para Vandermonde generamos el LaTeX a mano aplicando p a los
+        # indices de cada factor (alpha_i - alpha_j). Asi evitamos la
+        # canonizacion de sympy que reescribe (alpha_2 - alpha_1) como
+        # (-alpha_1 + alpha_2), perdiendo la accion clara de la permutacion.
         if via_disc:
-            sign = p.signature()
-            tag = r"\delta" if sign == 1 else r"-\delta"
-            conjugado_y = tag
-            conjugado_alpha = tag
+            conjugado_y = _conjugado_vandermonde_manual(p, n, usar_alpha=False)
+            conjugado_alpha = _conjugado_vandermonde_manual(p, n, usar_alpha=True)
         else:
             conjugado_y = _y_a_y_indexado_latex(conjugado_simb, n)
             conjugado_alpha = _y_a_alpha_latex(conjugado_simb, n)
@@ -507,7 +522,9 @@ def _probar_candidato(
 
     H_orden = ORDENES[H_name]
     invariante_y_latex_display = (
-        r"\delta" if via_disc else _y_a_y_indexado_latex(F_expr, n)
+        _conjugado_vandermonde_manual(Permutation(n - 1), n, usar_alpha=False)
+        if via_disc
+        else _y_a_y_indexado_latex(F_expr, n)
     )
     return CandidatoProbado(
         subgrupo_latex=G_name,
