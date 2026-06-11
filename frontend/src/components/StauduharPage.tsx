@@ -78,7 +78,10 @@ function preColoreLatex(latex: string): string {
     (match, sym, num) => {
       const c = COLORES_HEX[parseInt(num, 10)];
       if (!c) return match;
-      return `${sym}_{\\textcolor{#${c}}{${num}}}`;
+      // \htmlClass envuelve el numero coloreado en una clase CSS para
+      // que se le pueda aplicar la animacion individual de "pop" al
+      // disparar el efecto de permutacion.
+      return `${sym}_{\\htmlClass{anim-sub anim-sub-${num}}{\\textcolor{#${c}}{${num}}}}`;
     },
   );
 }
@@ -244,13 +247,32 @@ function flattenSteps(data: StauduharResponse): StepPos[] {
   return out;
 }
 
-function buildQAcumulada(cand: CandidatoProbado, hasta: number): string {
+function buildQAcumuladaSinClase(cand: CandidatoProbado, hasta: number): string {
+  // Version "limpia" sin la clase \htmlClass del ultimo factor: se
+  // usa para el fantasma que reserva el ancho del Q(t) final.
   const trozos: string[] = [];
   for (let i = 0; i <= hasta; i++) {
     const v = cand.cosets[i].valor_numerico_latex;
     if (v === '0') trozos.push('t');
     else if (v.startsWith('-')) trozos.push(`(t + ${v.slice(1)})`);
     else trozos.push(`(t - ${v})`);
+  }
+  return `Q(t) = ${trozos.join('')}`;
+}
+
+function buildQAcumulada(cand: CandidatoProbado, hasta: number): string {
+  const trozos: string[] = [];
+  for (let i = 0; i <= hasta; i++) {
+    const v = cand.cosets[i].valor_numerico_latex;
+    let trozo: string;
+    if (v === '0') trozo = 't';
+    else if (v.startsWith('-')) trozo = `(t + ${v.slice(1)})`;
+    else trozo = `(t - ${v})`;
+    // El último factor (el que se acaba de añadir) lleva una clase
+    // CSS propia para animarse en solitario, sin que los factores
+    // anteriores re-aparezcan.
+    if (i === hasta) trozo = `\\htmlClass{q-nuevo-factor}{${trozo}}`;
+    trozos.push(trozo);
   }
   return `Q(t) = ${trozos.join('')}`;
 }
@@ -380,6 +402,14 @@ export function StauduharPage({ onBack }: Props) {
   const [showInvActTooltip, setShowInvActTooltip] = useState(false);
   const [invTooltipPos, setInvTooltipPos] = useState({ top: 0, left: 0, width: 0 });
   const invWrapperRef = useRef<HTMLDivElement>(null);
+  // Solo `true` cuando la nueva aplicación viene de un estado ya
+  // aplicado. La primera aplicación de un candidato (transición desde
+  // el pre-state con F en y's) no debe disparar la animación.
+  const [animarSiguiente, setAnimarSiguiente] = useState(false);
+  // Mostrar el banner de conclusión solo tras la animación de
+  // permutación (no antes), para que no aparezca el hueco vacío
+  // empujando Q(t) hacia arriba.
+  const [mostrarBanner, setMostrarBanner] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const grado = useMemo(() => deducirGrado(polinomio), [polinomio]);
@@ -396,6 +426,7 @@ export function StauduharPage({ onBack }: Props) {
         setHasUserAction(false);
         setAppliedSteps(new Set());
         setHistorial([]);
+        setAnimarSiguiente(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error desconocido');
         setData(null);
@@ -514,7 +545,24 @@ export function StauduharPage({ onBack }: Props) {
     setAppliedSteps(new Set(last.appliedSteps));
     setHasUserAction(last.hasUserAction);
     setHistorial(historial.slice(0, -1));
+    setAnimarSiguiente(false);
   }, [historial]);
+
+  // Decide cuándo mostrar el banner de conclusión: solo cuando el
+  // candidato actual está completado, esperando ~900 ms si venimos
+  // de una animación de permutación.
+  useEffect(() => {
+    if (!data || !pos) { setMostrarBanner(false); return; }
+    const completado = candidatoCompletado(pos.nivelIdx, pos.candIdx);
+    if (!completado) { setMostrarBanner(false); return; }
+    if (animarSiguiente) {
+      setMostrarBanner(false);
+      const id = window.setTimeout(() => setMostrarBanner(true), 900);
+      return () => window.clearTimeout(id);
+    }
+    setMostrarBanner(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepIdx, appliedSteps, animarSiguiente]);
 
   // Atajo Ctrl+Z / Cmd+Z para deshacer la ultima accion.
   useEffect(() => {
@@ -589,6 +637,7 @@ export function StauduharPage({ onBack }: Props) {
     if (!data || !pos || candIdxObjetivo < 0) return;
     const target = stepIdxDePrimerCosetDe(pos.nivelIdx, candIdxObjetivo);
     pushHistorial();
+    setAnimarSiguiente(false);
     setHasUserAction(true);
     setStepIdx(target);
   }
@@ -603,6 +652,7 @@ export function StauduharPage({ onBack }: Props) {
       }
     }
     pushHistorial();
+    setAnimarSiguiente(false);
     setHasUserAction(true);
     setStepIdx(acc);
   }
@@ -786,6 +836,10 @@ export function StauduharPage({ onBack }: Props) {
                   );
                   if (!isNaN(targetIdx) && pos) {
                     pushHistorial();
+                    // Veníamos de un estado ya aplicado → animar; sino
+                    // (pre-state con F en y's) → primera aplicación sin
+                    // animación, sería transición visual brusca.
+                    setAnimarSiguiente(appliedSteps.has(stepIdx));
                     setHasUserAction(true);
                     const newStepIdx = Math.max(
                       0,
@@ -813,43 +867,69 @@ export function StauduharPage({ onBack }: Props) {
                     >
                       <Tex tex={`F = ${preColoreLatex(candActual.invariante_y_latex)}`} />
                     </div>
-                    <div className="Q-line" style={{ color: '#aaa' }}>
-                      <Tex tex="Q(t) = " />&nbsp;<span style={{ fontStyle: 'italic' }}>(sin clases laterales aplicadas)</span>
-                    </div>
                     <div className="ayuda-inicial">
-                      <p>
-                        Arrastra las clases laterales <strong>π<sub>i</sub></strong>{' '}
-                        del panel derecho sobre el invariante F para construir la
-                        resolvente Q(t) coset a coset. También puedes hacer click
-                        en otro candidato del panel izquierdo para navegar
-                        entre maximales transitivos.
-                      </p>
+                      Arrastra los representantes π<sub>i</sub> del panel derecho
+                      sobre el invariante F para construir la resolvente Q(t).
                     </div>
                   </>
-                ) : (
+                ) : (() => {
+                  // Calcular el conjugado y el valor "más largos" del
+                  // candidato para dimensionar los fantasmas que centran
+                  // los wrappers en su ancho final.
+                  const conjugadoMasLargo = candActual.cosets.reduce(
+                    (best, c) => c.conjugado_alpha_latex.length > best.length
+                      ? c.conjugado_alpha_latex : best,
+                    '',
+                  );
+                  const valorMasLargo = candActual.cosets.reduce(
+                    (best, c) => c.valor_numerico_latex.length > best.length
+                      ? c.valor_numerico_latex : best,
+                    '',
+                  );
+                  const QCompleto = buildQAcumuladaSinClase(
+                    candActual, candActual.cosets.length - 1,
+                  );
+                  const len = cosetActual.conjugado_alpha_latex.length;
+                  let fs = 30;
+                  if (len > 30) fs = 26;
+                  if (len > 60) fs = 22;
+                  if (len > 100) fs = 18;
+                  if (len > 160) fs = 15;
+                  const fsStyle = { fontSize: fs + 'px' };
+                  return (
                   <>
-                    <div
-                      className="alpha-eval"
-                      style={(() => {
-                        const len = cosetActual.conjugado_alpha_latex.length;
-                        let fs = 30;
-                        if (len > 30) fs = 26;
-                        if (len > 60) fs = 22;
-                        if (len > 100) fs = 18;
-                        if (len > 160) fs = 15;
-                        return { fontSize: fs + 'px' };
-                      })()}
-                    >
-                      <Tex tex={preColoreLatex(cosetActual.conjugado_alpha_latex)} />
-                      <span>&nbsp;=&nbsp;</span>
-                      <span className="swap-token centered">
-                        <Tex tex={preColoreLatex(cosetActual.valor_numerico_latex)} />
-                      </span>
+                    <div className="alpha-wrapper">
+                      <div className="alpha-eval ghost" style={fsStyle}>
+                        <Tex tex={preColoreLatex(conjugadoMasLargo)} />
+                        <span>&nbsp;=&nbsp;</span>
+                        <span className="swap-token centered">
+                          <Tex tex={preColoreLatex(valorMasLargo)} />
+                        </span>
+                      </div>
+                      <div
+                        key={animarSiguiente ? `a-${stepIdx}` : 'a-stable'}
+                        className={'alpha-eval real' + (animarSiguiente ? ' aplicada' : '')}
+                        style={fsStyle}
+                      >
+                        <Tex tex={preColoreLatex(cosetActual.conjugado_alpha_latex)} />
+                        <span>&nbsp;=&nbsp;</span>
+                        <span className="swap-token centered">
+                          <Tex tex={preColoreLatex(cosetActual.valor_numerico_latex)} />
+                        </span>
+                      </div>
                     </div>
-                    <div className="Q-line">
-                      <Tex tex={QAcumulada ?? 'Q(t) = '} />
+                    <div className="q-wrapper">
+                      <div className="Q-line ghost">
+                        <Tex tex={QCompleto} />
+                      </div>
+                      <div
+                        key={animarSiguiente ? `q-${stepIdx}` : 'q-stable'}
+                        className={'Q-line real' + (animarSiguiente ? ' aplicada' : '')}
+                      >
+                        <Tex tex={QAcumulada ?? 'Q(t) = '} />
+                      </div>
                     </div>
-                    {(() => {
+                    {mostrarBanner && (() => {
                       const completado = candidatoCompletado(pos.nivelIdx, pos.candIdx);
                       if (!completado) return null;
                       // ÉXITO: descender_a no null → hay raíz entera simple.
@@ -929,7 +1009,8 @@ export function StauduharPage({ onBack }: Props) {
                       );
                     })()}
                   </>
-                )}
+                  );
+                })()}
               </div>
 
               {/* Controles inferiores: solo deshacer y reset. */}

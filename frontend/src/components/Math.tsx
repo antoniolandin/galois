@@ -1,6 +1,6 @@
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 
 interface Props {
   tex: string;
@@ -8,10 +8,11 @@ interface Props {
 }
 
 // Render LaTeX inline (`display=false`) o bloque centrado (`display=true`).
-// Wrapper minimo sobre katex.renderToString para que el frontend pueda
-// embeber expresiones simbolicas devueltas por el backend (factorizaciones
-// sobre Q, polinomios resolventes, etc.) sin instalar react-katex.
-export function Math({ tex, display = false }: Props) {
+// Wrapper sobre katex.renderToString memoizado para que re-renders del
+// padre con el mismo `tex` no triggeen un nuevo objeto en
+// `dangerouslySetInnerHTML`, que causa re-mount del HTML interno y
+// dispara CSS animations de KaTeX otra vez.
+function MathRaw({ tex, display = false }: Props) {
   const html = useMemo(
     () =>
       katex.renderToString(tex, {
@@ -19,13 +20,19 @@ export function Math({ tex, display = false }: Props) {
         displayMode: display,
         output: 'html',
         strict: 'ignore',
+        trust: true,
       }),
     [tex, display],
   );
+  // Memoizamos el objeto literal: si `html` no cambió, React no
+  // detecta diff y no re-aplica el innerHTML.
+  const danger = useMemo(() => ({ __html: html }), [html]);
   return (
     <span
       className={display ? 'katex-display-wrap' : 'katex-inline-wrap'}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={danger}
     />
   );
 }
+
+export const Math = memo(MathRaw);
