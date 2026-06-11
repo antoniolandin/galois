@@ -1035,20 +1035,28 @@ export function StauduharPage({ onBack }: Props) {
                   if (len > 160) fs = 15;
                   if (len > 220) fs = 13;
                   if (len > 300) fs = 12;
+                  // A partir de cierto largo no cabe el conjugado y
+                  // el "= valor" en una sola línea: apilamos en dos.
+                  const vertical = len > 240;
                   const fsStyle = { fontSize: fs + 'px' };
+                  const evalCls = 'alpha-eval' + (vertical ? ' vertical' : '');
                   return (
                     <>
                       <div className="alpha-wrapper">
-                        <div className="alpha-eval ghost" style={fsStyle}>
+                        <div className={evalCls + ' ghost'} style={fsStyle}>
                           <Tex tex={preColoreLatex(conjugadoMasLargo)} />
-                          <span>&nbsp;=&nbsp;</span>
-                          <span className="swap-token centered">
-                            <Tex tex={preColoreLatex(valorMasLargo)} />
+                          <span className="alpha-eval-rhs">
+                            <span>&nbsp;=&nbsp;</span>
+                            <span className="swap-token centered">
+                              <Tex tex={preColoreLatex(valorMasLargo)} />
+                            </span>
                           </span>
                         </div>
-                        <div className="alpha-eval real" style={fsStyle}>
+                        <div className={evalCls + ' real'} style={fsStyle}>
                           <Tex tex={preColoreLatex(cosetIni.conjugado_alpha_latex)} />
-                          <span>&nbsp;=&nbsp;</span>
+                          <span className="alpha-eval-rhs">
+                            <span>&nbsp;=&nbsp;</span>
+                          </span>
                         </div>
                       </div>
                       <div className="q-wrapper">
@@ -1090,20 +1098,24 @@ export function StauduharPage({ onBack }: Props) {
                   if (len > 160) fs = 15;
                   if (len > 220) fs = 13;
                   if (len > 300) fs = 12;
+                  const vertical = len > 240;
                   const fsStyle = { fontSize: fs + 'px' };
+                  const evalCls = 'alpha-eval' + (vertical ? ' vertical' : '');
                   return (
                   <>
                     <div className="alpha-wrapper">
-                      <div className="alpha-eval ghost" style={fsStyle}>
+                      <div className={evalCls + ' ghost'} style={fsStyle}>
                         <Tex tex={preColoreLatex(conjugadoMasLargo)} />
-                        <span>&nbsp;=&nbsp;</span>
-                        <span className="swap-token centered">
-                          <Tex tex={preColoreLatex(valorMasLargo)} />
+                        <span className="alpha-eval-rhs">
+                          <span>&nbsp;=&nbsp;</span>
+                          <span className="swap-token centered">
+                            <Tex tex={preColoreLatex(valorMasLargo)} />
+                          </span>
                         </span>
                       </div>
                       <div
                         key={animDiff ? `a-${stepIdx}` : 'a-stable'}
-                        className={'alpha-eval real' + (animDiff ? ' aplicada' : '')}
+                        className={evalCls + ' real' + (animDiff ? ' aplicada' : '')}
                         style={fsStyle}
                       >
                         <Tex
@@ -1112,9 +1124,11 @@ export function StauduharPage({ onBack }: Props) {
                             animDiff ?? undefined,
                           )}
                         />
-                        <span>&nbsp;=&nbsp;</span>
-                        <span className="swap-token centered">
-                          <Tex tex={preColoreLatex(cosetActual.valor_numerico_latex)} />
+                        <span className="alpha-eval-rhs">
+                          <span>&nbsp;=&nbsp;</span>
+                          <span className="swap-token centered">
+                            <Tex tex={preColoreLatex(cosetActual.valor_numerico_latex)} />
+                          </span>
                         </span>
                       </div>
                     </div>

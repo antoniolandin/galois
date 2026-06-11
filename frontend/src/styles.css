@@ -832,6 +832,21 @@ body {
   white-space: nowrap;
   max-width: 100%;
 }
+/* Cuando el conjugado es muy largo (e.g., Vandermonde de grado 5)
+   apilamos la expresión: conjugado arriba y "= valor" centrado debajo,
+   para que el = no quede fuera del panel. */
+.alpha-eval.vertical {
+  flex-direction: column;
+  align-items: center;
+}
+.alpha-eval .alpha-eval-rhs {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+.alpha-eval.vertical .alpha-eval-rhs {
+  margin-top: 2px;
+}
 .alpha-eval > span {
   white-space: nowrap;
 }
