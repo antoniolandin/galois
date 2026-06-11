@@ -349,6 +349,41 @@ def _construir_catalogo():
             "Estabilizador $F_{20}$ (Frobenius de orden 20) en $S_5$."
         ),
     }
+    # F_20 -> D_5 : Vandermonde restringido a F_20. Como D_5 = A_5 ∩ F_20,
+    # el discriminante distingue los dos: si Delta_f es cuadrado, Gal
+    # esta en D_5; si no, queda en F_20.
+    cat[(5, "F_20", "D_5")] = {
+        "F": sp.prod(X5[i] - X5[j] for i in range(5) for j in range(i+1, 5)),
+        "X": X5,
+        # Representantes: e y (2 3 5 4) (0-indexado: (1 2 4 3)). Este
+        # 4-ciclo es impar y representa la clase F_20 \ D_5.
+        "cosets": [Permutation(4), Permutation([0, 2, 4, 1, 3])],
+        "via_discriminante": True,
+        "descripcion": (
+            "Restriccion del invariante de Vandermonde a $F_{20}$. Su "
+            "estabilizador en $F_{20}$ es $D_5 = A_5 \\cap F_{20}$, con "
+            "indice 2."
+        ),
+    }
+    # D_5 -> C_5 : invariante ciclico de grado 3 (Soicher-McKay).
+    # Fijado por el 5-ciclo (es ciclico) pero no por la reflexion de D_5.
+    F_d5_c5 = (
+        X5[0]*X5[1]**2 + X5[1]*X5[2]**2 + X5[2]*X5[3]**2 +
+        X5[3]*X5[4]**2 + X5[4]*X5[0]**2
+    )
+    cat[(5, "D_5", "C_5")] = {
+        "F": F_d5_c5,
+        "X": X5,
+        # Representantes: e y (2 5)(3 4) (0-indexado: (1 4)(2 3)), una
+        # reflexion de D_5 que no esta en C_5.
+        "cosets": [Permutation(4), Permutation([0, 4, 3, 2, 1])],
+        "via_discriminante": False,
+        "descripcion": (
+            r"Invariante ciclico $\sum_i y_i\, y_{i+1}^2$ (indices mod 5). "
+            "Esta fijado por el 5-ciclo pero no por las reflexiones, "
+            "asi que su estabilizador en $D_5$ es $C_5$."
+        ),
+    }
 
     return cat
 
@@ -373,8 +408,8 @@ DESCENSOS = {
     5: {
         "S_5": ["A_5", "F_20"],
         "A_5": [],          # A_5 simple, no descenso util en visor
-        "F_20": [],         # descenso D_5 sin invariante hardcodeado
-        "D_5": [],
+        "F_20": ["D_5"],
+        "D_5": ["C_5"],
         "C_5": [],
     },
 }
