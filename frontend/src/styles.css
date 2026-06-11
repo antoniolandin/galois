@@ -622,8 +622,11 @@ body {
   background: #f3f3f5;
 }
 
-/* Boton "back" reutiliza el mismo lenguaje que los .btn del visor. */
-.stauduhar-app .btn-back {
+/* Boton "back" reutiliza el mismo lenguaje que los .btn del visor.
+   Mismo estilo en el header del visor de Stauduhar y en el del visor
+   de monodromía (cuando ambos llevan la casita de "Inicio"). */
+.stauduhar-app .btn-back,
+.header .btn-back {
   background: transparent;
   border: 1px solid #d0d0d0;
   border-radius: 4px;
@@ -632,8 +635,14 @@ body {
   color: #555;
   cursor: pointer;
   font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
-.stauduhar-app .btn-back:hover { background: #f5f5f7; }
+.stauduhar-app .btn-back:hover,
+.header .btn-back:hover { background: #f5f5f7; }
+.btn-home { padding: 6px 10px; }
+.btn-home svg { display: block; }
 
 /* Sugerencias en el placeholder del viewport (solo cuando no hay data) */
 .stauduhar-vacio-sugerencias {

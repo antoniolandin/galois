@@ -8,8 +8,6 @@ interface Props {
   onChangeExpresion?: (expresion: string) => Promise<void>;
   // Callback para volver a la landing.
   onGoHome?: () => void;
-  // Callback para cambiar a la vista de Stauduhar (cuerpos de numeros).
-  onGoToStauduhar?: () => void;
 }
 
 // Sympy nos da expresiones tipo "alpha + x**5 - x" en un orden arbitrario.
@@ -87,7 +85,7 @@ function validar(
   return { ok: true, expr: norm };
 }
 
-export function Header({ expresion, onChangeExpresion, onGoHome, onGoToStauduhar }: Props) {
+export function Header({ expresion, onChangeExpresion, onGoHome }: Props) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -136,11 +134,19 @@ export function Header({ expresion, onChangeExpresion, onGoHome, onGoToStauduhar
     <header className="header">
       {onGoHome && (
         <button
-          className="btn-back"
+          className="btn-back btn-home"
           onClick={onGoHome}
           title="Volver a la página de inicio"
+          aria-label="Inicio"
         >
-          ← Inicio
+          <svg
+            width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+            strokeLinejoin="round" aria-hidden="true"
+          >
+            <path d="M3 11l9-8 9 8" />
+            <path d="M5 10v10h14V10" />
+          </svg>
         </button>
       )}
       <h1>Visualizador de monodromía</h1>
@@ -184,15 +190,6 @@ export function Header({ expresion, onChangeExpresion, onGoHome, onGoToStauduhar
           P(x, α) = {pretty(expresion)}
         </span>
       ) : null}
-      {onGoToStauduhar && (
-        <button
-          className="btn-stauduhar"
-          onClick={onGoToStauduhar}
-          title="Modo Stauduhar sobre cuerpos de números"
-        >
-          Stauduhar →
-        </button>
-      )}
     </header>
   );
 }

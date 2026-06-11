@@ -929,7 +929,6 @@ export default function App() {
         expresion={polinomio.expresion}
         onChangeExpresion={handleChangeExpresion}
         onGoHome={() => setPageView('landing')}
-        onGoToStauduhar={() => setPageView('stauduhar')}
       />
       <div className="main" key={polinomioKey}>
         {/* --- Columna 1: plano α --- */}
