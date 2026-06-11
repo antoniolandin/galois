@@ -28,14 +28,22 @@ import { ViewToggle, type View } from './components/ViewToggle';
 import { CameraToggle, type CameraMode } from './components/CameraToggle';
 import { StatsPills } from './components/StatsPills';
 import { StauduharPage } from './components/StauduharPage';
+import { LandingPage } from './components/LandingPage';
 import { DEFAULT_CAM, type CamState } from './galois/proyeccion3d';
 
-type PageView = 'monodromia' | 'stauduhar';
+type PageView = 'landing' | 'monodromia' | 'stauduhar';
 
 function pageDeUrl(): PageView {
-  return window.location.pathname.startsWith('/stauduhar')
-    ? 'stauduhar'
-    : 'monodromia';
+  const p = window.location.pathname;
+  if (p.startsWith('/stauduhar')) return 'stauduhar';
+  if (p.startsWith('/monodromia')) return 'monodromia';
+  return 'landing';
+}
+
+function pathDePage(v: PageView): string {
+  if (v === 'stauduhar') return '/stauduhar';
+  if (v === 'monodromia') return '/monodromia';
+  return '/';
 }
 
 // Un generador guardado lleva consigo todo el contexto visual que se
@@ -58,10 +66,10 @@ export default function App() {
   // antes de pedir el polinomio al backend.
   const [pageView, setPageView] = useState<PageView>(pageDeUrl());
 
-  // Sincroniza pageView <-> URL para que /monodromia y /stauduhar
+  // Sincroniza pageView <-> URL para que /, /monodromia y /stauduhar
   // sean bookmarkeables y la recarga no devuelva siempre al primero.
   useEffect(() => {
-    const path = pageView === 'stauduhar' ? '/stauduhar' : '/monodromia';
+    const path = pathDePage(pageView);
     if (window.location.pathname !== path) {
       window.history.pushState({}, '', path);
     }
@@ -847,14 +855,23 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [mode, handleDeshacer, handleEscape, generadores.length]);
 
+  if (pageView === 'landing') {
+    return (
+      <LandingPage
+        onGoToMonodromia={() => setPageView('monodromia')}
+        onGoToStauduhar={() => setPageView('stauduhar')}
+      />
+    );
+  }
+
   if (pageView === 'stauduhar') {
-    return <StauduharPage onBack={() => setPageView('monodromia')} />;
+    return <StauduharPage onBack={() => setPageView('landing')} />;
   }
 
   if (!polinomio) {
     return (
       <div className="app">
-        <Header />
+        <Header onGoHome={() => setPageView('landing')} />
         <div style={{ padding: 20, color: '#666' }}>
           Esperando al backend en <code>http://localhost:8000</code>…
         </div>
@@ -911,6 +928,7 @@ export default function App() {
       <Header
         expresion={polinomio.expresion}
         onChangeExpresion={handleChangeExpresion}
+        onGoHome={() => setPageView('landing')}
         onGoToStauduhar={() => setPageView('stauduhar')}
       />
       <div className="main" key={polinomioKey}>

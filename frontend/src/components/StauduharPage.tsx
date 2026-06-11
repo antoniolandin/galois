@@ -817,7 +817,7 @@ export function StauduharPage({ onBack }: Props) {
     <div className="stauduhar-app">
       {/* ===== Header (clon del Header de monodromia) ===== */}
       <header className="header">
-        <button className="btn-back" onClick={onBack}>← Monodromía</button>
+        <button className="btn-back" onClick={onBack}>← Inicio</button>
         <h1>Visualizador del descenso de Stauduhar</h1>
         {editing ? (
           <div className="poly-edit">

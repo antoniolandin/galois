@@ -1195,3 +1195,122 @@ body {
   letter-spacing: 0.06em;
 }
 
+
+/* ===== Landing page ============================================ */
+.landing {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 0%, #ffffff 0%, #f4f4f6 60%, #ececef 100%);
+  padding: 40px 24px;
+  box-sizing: border-box;
+}
+.landing-inner {
+  max-width: 1080px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+.landing-head {
+  text-align: center;
+}
+.landing-head h1 {
+  font-size: 32px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 16px 0;
+  letter-spacing: -0.01em;
+}
+.landing-sub {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #555;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.landing-sub .ital {
+  font-style: italic;
+}
+.landing-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+@media (max-width: 760px) {
+  .landing-cards { grid-template-columns: 1fr; }
+}
+.landing-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 28px 28px 22px 28px;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out,
+    border-color 0.12s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 280px;
+}
+.landing-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.landing-card-monodromia:hover {
+  border-color: #0072B2;
+}
+.landing-card-stauduhar:hover {
+  border-color: #D55E00;
+}
+.landing-card-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+}
+.landing-card h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+  color: #1a1a1a;
+}
+.landing-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #555;
+  margin: 0;
+  flex-grow: 1;
+}
+.landing-card p code {
+  font-family: var(--font-math, 'Fira Code', monospace);
+  background: #f4f4f6;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 13px;
+  color: #1a1a1a;
+}
+.landing-card .ital {
+  font-style: italic;
+}
+.landing-card-cta {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+.landing-card-monodromia .landing-card-cta { color: #0072B2; }
+.landing-card-stauduhar .landing-card-cta { color: #D55E00; }
+.landing-foot {
+  text-align: center;
+  font-size: 12px;
+  color: #999;
+  letter-spacing: 0.03em;
+}

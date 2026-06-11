@@ -6,6 +6,8 @@ interface Props {
   // promesa rechaza, el header muestra el mensaje y mantiene el
   // input abierto para que el usuario lo corrija.
   onChangeExpresion?: (expresion: string) => Promise<void>;
+  // Callback para volver a la landing.
+  onGoHome?: () => void;
   // Callback para cambiar a la vista de Stauduhar (cuerpos de numeros).
   onGoToStauduhar?: () => void;
 }
@@ -85,7 +87,7 @@ function validar(
   return { ok: true, expr: norm };
 }
 
-export function Header({ expresion, onChangeExpresion, onGoToStauduhar }: Props) {
+export function Header({ expresion, onChangeExpresion, onGoHome, onGoToStauduhar }: Props) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +134,15 @@ export function Header({ expresion, onChangeExpresion, onGoToStauduhar }: Props)
 
   return (
     <header className="header">
+      {onGoHome && (
+        <button
+          className="btn-back"
+          onClick={onGoHome}
+          title="Volver a la página de inicio"
+        >
+          ← Inicio
+        </button>
+      )}
       <h1>Visualizador de monodromía</h1>
       {editing ? (
         <div className="poly-edit">
