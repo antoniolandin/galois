@@ -182,8 +182,17 @@ def _valor_complejo_latex(v: complex, tol: float = 1e-8) -> str:
             if iv == -1: return "-i"
             return rf"{iv} i"
         return rf"{im:.3f} i"
-    # Complejo general
-    return rf"{v.real:.3f} + {v.imag:.3f} i"
+    # Complejo general — pero suprime la parte imaginaria si redondeada
+    # a 3 decimales es 0 (evita "+ 0.000 i" o "+ -0.000 i" en pantalla).
+    re_disp = f"{v.real:.3f}".lstrip()
+    im_disp = f"{v.imag:.3f}"
+    if im_disp in ("0.000", "-0.000"):
+        return re_disp
+    if re_disp in ("0.000", "-0.000"):
+        return rf"{im_disp} i"
+    if v.imag >= 0:
+        return rf"{re_disp} + {im_disp} i"
+    return rf"{re_disp} - {im_disp.lstrip('-')} i"
 
 
 def _conjugado_vandermonde_manual(p: Permutation, n: int, usar_alpha: bool) -> str:
