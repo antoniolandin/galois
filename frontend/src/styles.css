@@ -863,11 +863,17 @@ body {
 .mexpr-sym sub.y5 { color: #0072B2; }
 .mexpr-op { display: inline; }
 
-/* Texto explicativo en el estado inicial (0 aplicadas): mismo gris e
-   itálica que el "(sin clases laterales aplicadas)" del Q(t). */
+/* Texto explicativo en el estado inicial (0 aplicadas): pegado al
+   fondo del escenario via `position: absolute` para que no participe
+   del flujo flex y no desplace el centrado de la α-eval / Q-line.
+   Asi al desaparecer (tras la primera aplicacion) la animacion no
+   arranca desde una posicion shifteada. */
 .ayuda-inicial {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   max-width: 560px;
-  margin-top: 18px;
   font-size: 13px;
   color: #aaa;
   font-style: italic;
@@ -899,16 +905,34 @@ body {
 .exito-banner strong { color: #009E73; }
 .exito-banner .btn { font-size: 13px; }
 
-/* Fade-in del banner cuando se monta. El delay (esperar a la
-   animación de permutación) se gestiona desde JS con un setTimeout
-   para que el hueco vacío no empuje Q(t) hacia arriba mientras tanto. */
+/* Entrada gradual del banner: además del fade, animamos max-height +
+   margin-top + padding + border para que la α-eval / Q-line se
+   desplacen suavemente hacia arriba en vez de hacerlo de golpe al
+   montar el banner. */
 .exito-banner,
 .fracaso-banner {
   animation: banner-appear 0.45s ease-out;
+  overflow: hidden;
 }
 @keyframes banner-appear {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    max-height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 240px;
+    margin-top: 14px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+  }
 }
 
 /* Banner de descarte del candidato: aparece cuando la resolvente
@@ -1013,20 +1037,6 @@ body {
   justify-self: start;
 }
 
-/* Solo el último factor de Q(t) se anima cuando se acaba de añadir.
-   Los factores anteriores se quedan estáticos.
-   Usamos `clip-path: inset(...)` en lugar de `scale`/`opacity` porque
-   el factor ya ocupa su ancho natural desde el momento del montaje:
-   Q(t) tiene su tamaño final sin que el resto se desplace. La
-   animación lo "revela" de izquierda a derecha como un cortinaje. */
-.q-nuevo-factor { display: inline-block; }
-.Q-line.aplicada .q-nuevo-factor {
-  animation: q-factor-reveal 0.5s ease-out 250ms backwards;
-}
-@keyframes q-factor-reveal {
-  0%   { clip-path: inset(0 100% 0 0); opacity: 0.4; }
-  100% { clip-path: inset(0 0 0 0);    opacity: 1; }
-}
 
 /* Controles inferiores del viewport */
 .controles {
@@ -1066,6 +1076,26 @@ body {
   color: #555;
   font-size: 13px;
   text-align: center;
+}
+.stauduhar-loading {
+  margin: 100px auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  color: #555;
+  font-size: 13px;
+}
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #D55E00;
+  border-radius: 50%;
+  animation: spinner-rot 0.9s linear infinite;
+}
+@keyframes spinner-rot {
+  to { transform: rotate(360deg); }
 }
 
 /* ----- Col 3: invariante actual + cosets + retículo ----- */

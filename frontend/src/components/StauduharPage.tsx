@@ -6,6 +6,7 @@ import {
   type StauduharResponse,
   type CandidatoProbado,
   type CosetApp,
+  type GrupoInfo,
 } from '../api/client';
 import { Math as Tex } from './Math';
 
@@ -62,9 +63,10 @@ function renderInlineMath(s: string): string {
 // HTML con clases para colorear por raíz. Más fiel al boceto que KaTeX
 // porque usa la fuente Fira Code y aplica la paleta Okabe-Ito a los
 // subíndices.
-// Inyecta \textcolor{#hex}{N} en los subindices de \alpha_{N} y y_{N}
-// antes de pasar el LaTeX a KaTeX. Asi el render KaTeX (serif clasica
-// de matematicas) conserva la paleta Okabe-Ito por raiz.
+// Inyecta \textcolor{#hex}{N} en los subindices de \alpha_{N} antes
+// de pasar el LaTeX a KaTeX. Solo aplica a alphas — los y_i del
+// invariante simbólico se quedan en negro para no contaminar con
+// la paleta de raíces a un objeto que aún no se ha especializado.
 const COLORES_HEX: Record<number, string> = {
   1: '56B4E9',
   2: 'E69F00',
@@ -72,18 +74,46 @@ const COLORES_HEX: Record<number, string> = {
   4: 'CC79A7',
   5: '0072B2',
 };
-function preColoreLatex(latex: string): string {
+function preColoreLatex(latex: string, animSet?: Set<number>): string {
+  // `animSet` opcional: si se pasa, solo los subindices cuya posicion
+  // (orden de aparicion 0-indexado) esta en el Set llevan la clase
+  // `anim-sub` que dispara la animacion de pop. El coloreado por
+  // raiz (paleta Okabe-Ito) se aplica siempre.
+  let occ = -1;
   return latex.replace(
-    /(\\alpha|y)_\{?(\d+)\}?/g,
-    (match, sym, num) => {
+    /\\alpha_\{?(\d+)\}?/g,
+    (match, num) => {
+      occ++;
       const c = COLORES_HEX[parseInt(num, 10)];
       if (!c) return match;
-      // \htmlClass envuelve el numero coloreado en una clase CSS para
-      // que se le pueda aplicar la animacion individual de "pop" al
-      // disparar el efecto de permutacion.
-      return `${sym}_{\\htmlClass{anim-sub anim-sub-${num}}{\\textcolor{#${c}}{${num}}}}`;
+      const inner = `\\textcolor{#${c}}{${num}}`;
+      const shouldAnim = animSet !== undefined && animSet.has(occ);
+      if (shouldAnim) {
+        return `\\alpha_{\\htmlClass{anim-sub anim-sub-${num}}{${inner}}}`;
+      }
+      return `\\alpha_{${inner}}`;
     },
   );
+}
+
+// Compara dos LaTeX de conjugados (estructura idéntica, solo cambian
+// los índices de α). Devuelve el Set de posiciones (0-indexadas por
+// orden de aparición de \alpha_{N}) donde el índice difiere.
+function diffPosicionesAlpha(oldLatex: string, newLatex: string): Set<number> {
+  const re = /\\alpha_\{?(\d+)\}?/g;
+  const extraer = (s: string): number[] => {
+    const out: number[] = [];
+    let m: RegExpExecArray | null;
+    const r = new RegExp(re.source, 'g');
+    while ((m = r.exec(s)) !== null) out.push(parseInt(m[1], 10));
+    return out;
+  };
+  const a = extraer(oldLatex);
+  const b = extraer(newLatex);
+  const diff = new Set<number>();
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) if (a[i] !== b[i]) diff.add(i);
+  return diff;
 }
 
 // Render Fira Code para nombres de grupo: "S_4", "D_4", "F_{20}",
@@ -151,7 +181,7 @@ function renderExpr(latex: string): JSX.Element {
       out.push(
         <span key={key++} className="mexpr-sym">
           y
-          {sub !== null && <sub className={`y${sub}`}>{sub}</sub>}
+          {sub !== null && <sub>{sub}</sub>}
           {sup !== null && <sup>{sup}</sup>}
         </span>,
       );
@@ -260,19 +290,21 @@ function buildQAcumuladaSinClase(cand: CandidatoProbado, hasta: number): string 
   return `Q(t) = ${trozos.join('')}`;
 }
 
-function buildQAcumulada(cand: CandidatoProbado, hasta: number): string {
+function buildQDeAplicados(
+  cand: CandidatoProbado,
+  start: number,
+  applied: Set<number>,
+): string {
+  // Solo incluye factores de cosets que el usuario ha aplicado de
+  // verdad: arrastrar π_2 antes que π_1 NO debe pintar el factor
+  // asociado a π_1.
   const trozos: string[] = [];
-  for (let i = 0; i <= hasta; i++) {
+  for (let i = 0; i < cand.cosets.length; i++) {
+    if (!applied.has(start + i)) continue;
     const v = cand.cosets[i].valor_numerico_latex;
-    let trozo: string;
-    if (v === '0') trozo = 't';
-    else if (v.startsWith('-')) trozo = `(t + ${v.slice(1)})`;
-    else trozo = `(t - ${v})`;
-    // El último factor (el que se acaba de añadir) lleva una clase
-    // CSS propia para animarse en solitario, sin que los factores
-    // anteriores re-aparezcan.
-    if (i === hasta) trozo = `\\htmlClass{q-nuevo-factor}{${trozo}}`;
-    trozos.push(trozo);
+    if (v === '0') trozos.push('t');
+    else if (v.startsWith('-')) trozos.push(`(t + ${v.slice(1)})`);
+    else trozos.push(`(t - ${v})`);
   }
   return `Q(t) = ${trozos.join('')}`;
 }
@@ -379,6 +411,81 @@ function Reticulo({
   );
 }
 
+// Pill con hover que muestra el resumen abstracto del grupo
+// (abeliano, resoluble, etc.). Misma información y estilo que la
+// pill "Estructura" del visor de monodromía (StatsPills).
+function PillGrupo(props: {
+  label: string;
+  nombre: string;
+  orden: number;
+  grado: number;
+  info: GrupoInfo | null;
+  completo?: boolean;
+}) {
+  const { label, nombre, orden, grado, info, completo } = props;
+  const [showInfo, setShowInfo] = useState(false);
+  const bool = (b: boolean | null | undefined): string =>
+    b === true ? 'sí' : b === false ? 'no' : '—';
+  const centro = (n: number | null | undefined): string =>
+    n == null ? '—' : n === 1 ? 'trivial' : String(n);
+  const factores = (fs: string[] | undefined): string =>
+    !fs || fs.length === 0 ? '—' : [...fs].reverse().join(' · ');
+  return (
+    <span
+      className={
+        'pill pill-grupo' +
+        (label === 'Nivel' ? ' pill-nivel' : '') +
+        (completo ? ' completo' : '')
+      }
+      onMouseEnter={() => setShowInfo(true)}
+      onMouseLeave={() => setShowInfo(false)}
+    >
+      <span className="lbl">{label}</span>
+      <span className="val">{renderGroupName(nombre)}</span>
+      {showInfo && info && (
+        <div className="pill-tooltip">
+          <dl>
+            {info.tid != null && (
+              <>
+                <dt>T-number</dt>
+                <dd>{grado}T{info.tid}</dd>
+              </>
+            )}
+            <dt>Orden</dt>
+            <dd>{orden}</dd>
+            <dt>Abeliano</dt>
+            <dd>{bool(info.is_abelian)}</dd>
+            <dt>Resoluble</dt>
+            <dd>{bool(info.is_solvable)}</dd>
+            <dt>Nilpotente</dt>
+            <dd>{bool(info.is_nilpotent)}</dd>
+            <dt>Simple</dt>
+            <dd>{bool(info.is_simple)}</dd>
+            <dt>Perfecto</dt>
+            <dd>{bool(info.is_perfect)}</dd>
+            <dt>Transitivo</dt>
+            <dd>{bool(info.is_transitive)}</dd>
+            {info.is_primitive != null && (
+              <>
+                <dt>Primitivo</dt>
+                <dd>{bool(info.is_primitive)}</dd>
+              </>
+            )}
+            <dt>Centro</dt>
+            <dd>{centro(info.center_order)}</dd>
+            {info.composition_factors && info.composition_factors.length > 0 && (
+              <>
+                <dt>Factores</dt>
+                <dd>{factores(info.composition_factors)}</dd>
+              </>
+            )}
+          </dl>
+        </div>
+      )}
+    </span>
+  );
+}
+
 export function StauduharPage({ onBack }: Props) {
   const [polinomio, setPolinomio] = useState('x^4 - 2');
   const [editing, setEditing] = useState(false);
@@ -402,10 +509,10 @@ export function StauduharPage({ onBack }: Props) {
   const [showInvActTooltip, setShowInvActTooltip] = useState(false);
   const [invTooltipPos, setInvTooltipPos] = useState({ top: 0, left: 0, width: 0 });
   const invWrapperRef = useRef<HTMLDivElement>(null);
-  // Solo `true` cuando la nueva aplicación viene de un estado ya
-  // aplicado. La primera aplicación de un candidato (transición desde
-  // el pre-state con F en y's) no debe disparar la animación.
-  const [animarSiguiente, setAnimarSiguiente] = useState(false);
+  // Posiciones (0-indexadas por orden de aparición de \alpha_{N} en
+  // el conjugado) que cambiaron de la última aplicación a la nueva.
+  // null = no animar (no había diff o no hay aplicación pendiente).
+  const [animDiff, setAnimDiff] = useState<Set<number> | null>(null);
   // Mostrar el banner de conclusión solo tras la animación de
   // permutación (no antes), para que no aparezca el hueco vacío
   // empujando Q(t) hacia arriba.
@@ -426,7 +533,7 @@ export function StauduharPage({ onBack }: Props) {
         setHasUserAction(false);
         setAppliedSteps(new Set());
         setHistorial([]);
-        setAnimarSiguiente(false);
+        setAnimDiff(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error desconocido');
         setData(null);
@@ -545,7 +652,7 @@ export function StauduharPage({ onBack }: Props) {
     setAppliedSteps(new Set(last.appliedSteps));
     setHasUserAction(last.hasUserAction);
     setHistorial(historial.slice(0, -1));
-    setAnimarSiguiente(false);
+    setAnimDiff(null);
   }, [historial]);
 
   // Decide cuándo mostrar el banner de conclusión: solo cuando el
@@ -555,14 +662,14 @@ export function StauduharPage({ onBack }: Props) {
     if (!data || !pos) { setMostrarBanner(false); return; }
     const completado = candidatoCompletado(pos.nivelIdx, pos.candIdx);
     if (!completado) { setMostrarBanner(false); return; }
-    if (animarSiguiente) {
+    if (animDiff && animDiff.size > 0) {
       setMostrarBanner(false);
       const id = window.setTimeout(() => setMostrarBanner(true), 900);
       return () => window.clearTimeout(id);
     }
     setMostrarBanner(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepIdx, appliedSteps, animarSiguiente]);
+  }, [stepIdx, appliedSteps, animDiff]);
 
   // Atajo Ctrl+Z / Cmd+Z para deshacer la ultima accion.
   useEffect(() => {
@@ -637,7 +744,7 @@ export function StauduharPage({ onBack }: Props) {
     if (!data || !pos || candIdxObjetivo < 0) return;
     const target = stepIdxDePrimerCosetDe(pos.nivelIdx, candIdxObjetivo);
     pushHistorial();
-    setAnimarSiguiente(false);
+    setAnimDiff(null);
     setHasUserAction(true);
     setStepIdx(target);
   }
@@ -652,13 +759,16 @@ export function StauduharPage({ onBack }: Props) {
       }
     }
     pushHistorial();
-    setAnimarSiguiente(false);
+    setAnimDiff(null);
     setHasUserAction(true);
     setStepIdx(acc);
   }
 
+  const startCandActual = pos
+    ? stepIdxDePrimerCosetDe(pos.nivelIdx, pos.candIdx)
+    : 0;
   const QAcumulada = candActual && pos
-    ? buildQAcumulada(candActual, pos.cosetIdx)
+    ? buildQDeAplicados(candActual, startCandActual, appliedSteps)
     : null;
 
   return (
@@ -750,6 +860,12 @@ export function StauduharPage({ onBack }: Props) {
         {/* --- Col 2: viewport central --- */}
         <section className="col-viewport panel">
           {error && <div className="stauduhar-error">{error}</div>}
+          {loading && (
+            <div className="stauduhar-loading">
+              <div className="loading-spinner" />
+              <p>Calculando descenso de Stauduhar…</p>
+            </div>
+          )}
           {!data && !error && !loading && (
             <div className="stauduhar-vacio">
               <p>Selecciona un polinomio canónico o introduce uno propio.</p>
@@ -803,18 +919,21 @@ export function StauduharPage({ onBack }: Props) {
                   );
                 })()}
                 <div className="stat-pills">
-                  <span className={'pill pill-nivel' + (grupoFinalAlcanzado ? ' completo' : '')}>
-                    <span className="lbl">Nivel</span>
-                    <span className="val">
-                      {renderGroupName(nivelActual.grupo_actual_latex)}
-                    </span>
-                  </span>
-                  <span className="pill">
-                    <span className="lbl">Candidato</span>
-                    <span className="val">
-                      {renderGroupName(candActual.subgrupo_latex)}
-                    </span>
-                  </span>
+                  <PillGrupo
+                    label="Nivel"
+                    nombre={nivelActual.grupo_actual_latex}
+                    orden={nivelActual.grupo_actual_orden}
+                    grado={data!.grado}
+                    info={nivelActual.grupo_actual_info ?? null}
+                    completo={!!grupoFinalAlcanzado}
+                  />
+                  <PillGrupo
+                    label="Candidato"
+                    nombre={candActual.subgrupo_latex}
+                    orden={candActual.subgrupo_orden}
+                    grado={data!.grado}
+                    info={candActual.subgrupo_info ?? null}
+                  />
                 </div>
               </div>
 
@@ -834,12 +953,17 @@ export function StauduharPage({ onBack }: Props) {
                   const targetIdx = parseInt(
                     e.dataTransfer.getData('text/plain'), 10,
                   );
-                  if (!isNaN(targetIdx) && pos) {
+                  if (!isNaN(targetIdx) && pos && candActual && cosetActual) {
                     pushHistorial();
-                    // Veníamos de un estado ya aplicado → animar; sino
-                    // (pre-state con F en y's) → primera aplicación sin
-                    // animación, sería transición visual brusca.
-                    setAnimarSiguiente(appliedSteps.has(stepIdx));
+                    // Diff entre el conjugado que se está mostrando
+                    // (cosetActual) y el del nuevo representante (target).
+                    // En pre-state cosetActual es cosets[0] = identidad, así
+                    // que arrastrar e sobre 0 aplicadas da diff vacío.
+                    const oldLatex = cosetActual.conjugado_alpha_latex;
+                    const newLatex =
+                      candActual.cosets[targetIdx].conjugado_alpha_latex;
+                    const diff = diffPosicionesAlpha(oldLatex, newLatex);
+                    setAnimDiff(diff.size > 0 ? diff : null);
                     setHasUserAction(true);
                     const newStepIdx = Math.max(
                       0,
@@ -850,29 +974,61 @@ export function StauduharPage({ onBack }: Props) {
                   }
                 }}
               >
-                {!appliedSteps.has(stepIdx) ? (
-                  // Pre-aplicacion del candidato actual: F en y's, sin coset.
-                  <>
-                    <div
-                      className="alpha-eval"
-                      style={(() => {
-                        const len = candActual.invariante_y_latex.length;
-                        let fs = 30;
-                        if (len > 30) fs = 26;
-                        if (len > 60) fs = 22;
-                        if (len > 100) fs = 18;
-                        if (len > 160) fs = 15;
-                        return { fontSize: fs + 'px' };
-                      })()}
-                    >
-                      <Tex tex={`F = ${preColoreLatex(candActual.invariante_y_latex)}`} />
-                    </div>
-                    <div className="ayuda-inicial">
-                      Arrastra los representantes π<sub>i</sub> del panel derecho
-                      sobre el invariante F para construir la resolvente Q(t).
-                    </div>
-                  </>
-                ) : (() => {
+                {!appliedSteps.has(stepIdx) ? (() => {
+                  // Pre-aplicación: el conjugado en α del primer
+                  // representante (la identidad, π₁ = e) y Q(t) con
+                  // el placeholder gris.
+                  const cosetIni = candActual.cosets[0];
+                  const conjugadoMasLargo = candActual.cosets.reduce(
+                    (best, c) => c.conjugado_alpha_latex.length > best.length
+                      ? c.conjugado_alpha_latex : best,
+                    '',
+                  );
+                  const valorMasLargo = candActual.cosets.reduce(
+                    (best, c) => c.valor_numerico_latex.length > best.length
+                      ? c.valor_numerico_latex : best,
+                    '',
+                  );
+                  const QCompleto = buildQAcumuladaSinClase(
+                    candActual, candActual.cosets.length - 1,
+                  );
+                  const len = cosetIni.conjugado_alpha_latex.length;
+                  let fs = 30;
+                  if (len > 30) fs = 26;
+                  if (len > 60) fs = 22;
+                  if (len > 100) fs = 18;
+                  if (len > 160) fs = 15;
+                  const fsStyle = { fontSize: fs + 'px' };
+                  return (
+                    <>
+                      <div className="alpha-wrapper">
+                        <div className="alpha-eval ghost" style={fsStyle}>
+                          <Tex tex={preColoreLatex(conjugadoMasLargo)} />
+                          <span>&nbsp;=&nbsp;</span>
+                          <span className="swap-token centered">
+                            <Tex tex={preColoreLatex(valorMasLargo)} />
+                          </span>
+                        </div>
+                        <div className="alpha-eval real" style={fsStyle}>
+                          <Tex tex={preColoreLatex(cosetIni.conjugado_alpha_latex)} />
+                          <span>&nbsp;=&nbsp;</span>
+                        </div>
+                      </div>
+                      <div className="q-wrapper">
+                        <div className="Q-line ghost">
+                          <Tex tex={QCompleto} />
+                        </div>
+                        <div className="Q-line real" style={{ color: '#aaa' }}>
+                          <Tex tex="Q(t) = " />
+                        </div>
+                      </div>
+                      <div className="ayuda-inicial">
+                        Arrastra los representantes π<sub>i</sub> del panel derecho
+                        sobre el invariante F para construir la resolvente Q(t).
+                      </div>
+                    </>
+                  );
+                })() : (() => {
                   // Calcular el conjugado y el valor "más largos" del
                   // candidato para dimensionar los fantasmas que centran
                   // los wrappers en su ancho final.
@@ -907,11 +1063,16 @@ export function StauduharPage({ onBack }: Props) {
                         </span>
                       </div>
                       <div
-                        key={animarSiguiente ? `a-${stepIdx}` : 'a-stable'}
-                        className={'alpha-eval real' + (animarSiguiente ? ' aplicada' : '')}
+                        key={animDiff ? `a-${stepIdx}` : 'a-stable'}
+                        className={'alpha-eval real' + (animDiff ? ' aplicada' : '')}
                         style={fsStyle}
                       >
-                        <Tex tex={preColoreLatex(cosetActual.conjugado_alpha_latex)} />
+                        <Tex
+                          tex={preColoreLatex(
+                            cosetActual.conjugado_alpha_latex,
+                            animDiff ?? undefined,
+                          )}
+                        />
                         <span>&nbsp;=&nbsp;</span>
                         <span className="swap-token centered">
                           <Tex tex={preColoreLatex(cosetActual.valor_numerico_latex)} />
@@ -922,10 +1083,7 @@ export function StauduharPage({ onBack }: Props) {
                       <div className="Q-line ghost">
                         <Tex tex={QCompleto} />
                       </div>
-                      <div
-                        key={animarSiguiente ? `q-${stepIdx}` : 'q-stable'}
-                        className={'Q-line real' + (animarSiguiente ? ' aplicada' : '')}
-                      >
+                      <div className="Q-line real">
                         <Tex tex={QAcumulada ?? 'Q(t) = '} />
                       </div>
                     </div>

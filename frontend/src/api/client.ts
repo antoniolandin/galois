@@ -129,6 +129,19 @@ export interface CosetApp {
   valor_es_entero: boolean;
 }
 
+export interface GrupoInfo {
+  is_abelian?: boolean | null;
+  is_solvable?: boolean | null;
+  is_nilpotent?: boolean | null;
+  is_perfect?: boolean | null;
+  is_simple?: boolean | null;
+  is_transitive?: boolean | null;
+  is_primitive?: boolean | null;
+  tid?: number | null;
+  center_order?: number | null;
+  composition_factors?: string[];
+}
+
 export interface CandidatoProbado {
   subgrupo_latex: string;
   subgrupo_orden: number;
@@ -142,6 +155,7 @@ export interface CandidatoProbado {
   descender_a: string | null;
   coset_descenso_idx: number | null;
   razon: string;
+  subgrupo_info?: GrupoInfo | null;
 }
 
 export interface NivelDescenso {
@@ -149,6 +163,7 @@ export interface NivelDescenso {
   grupo_actual_orden: number;
   candidatos: CandidatoProbado[];
   descender_a: string | null;
+  grupo_actual_info?: GrupoInfo | null;
 }
 
 export interface StauduharResponse {
