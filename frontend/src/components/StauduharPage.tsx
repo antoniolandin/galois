@@ -493,7 +493,10 @@ export function StauduharPage({ onBack }: Props) {
   const [polyError, setPolyError] = useState<string | null>(null);
   const [data, setData] = useState<StauduharResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // true desde el primer render: el `useEffect` de montaje lanza
+  // `calcular` inmediatamente, así que no queremos pestañear el
+  // panel "vacío" antes de que se vea el spinner.
+  const [loading, setLoading] = useState(true);
   const [stepIdx, setStepIdx] = useState(0);
   const [hasUserAction, setHasUserAction] = useState(false);
   // Set de stepIdx que el usuario ha aplicado. Un candidato se
@@ -612,6 +615,33 @@ export function StauduharPage({ onBack }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, pos, appliedSteps]);
 
+
+  // El candidato actual concluye el descenso aun cuando su nivel
+  // siguiente exista, si éste no tiene candidatos (la tabla de
+  // descensos hardcodeados no cubre más allá). En ese caso el
+  // grupo de Galois es `candActual.descender_a` y no hay "siguiente
+  // nivel" al que avanzar sin romper el index de steps.
+  const descensoTerminado = useMemo(() => {
+    if (!data || !pos || !candActual) return false;
+    if (!candidatoCompletado(pos.nivelIdx, pos.candIdx)) return false;
+    if (candActual.descender_a === null) return false;
+    const prox = data.niveles[pos.nivelIdx + 1];
+    return prox != null && prox.candidatos.length === 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, pos, candActual, appliedSteps]);
+
+  // Nombre, orden e info del grupo que se muestra en la pill "Nivel".
+  // Siempre el del nivel actual: cuando el catálogo se queda corto
+  // sin haber confirmado el grupo de Galois, no debemos pintar en
+  // verde como si lo hubiéramos identificado.
+  const nivelPillNombre = nivelActual?.grupo_actual_latex ?? '';
+  const nivelPillOrden = nivelActual?.grupo_actual_orden ?? 0;
+  const nivelPillInfo = nivelActual?.grupo_actual_info ?? null;
+
+  // El nodo verde del retículo solo aparece cuando el descenso ha
+  // concluido legítimamente (todos los maximales del nivel actual
+  // probados). Si el catálogo se ha quedado corto, lo dejamos sin
+  // marcar para no sugerir una conclusión que no se ha alcanzado.
   const nodoFinal = grupoFinalAlcanzado;
 
   // Candidatos descartados: completados (resolvente entera construida)
@@ -752,6 +782,11 @@ export function StauduharPage({ onBack }: Props) {
   // Salta al primer coset del primer candidato del nivel `niObjetivo`.
   function irANivel(niObjetivo: number) {
     if (!data || niObjetivo < 0 || niObjetivo >= data.niveles.length) return;
+    // Si el nivel destino no tiene cosets, no podemos posicionar
+    // stepIdx en él (steps[stepIdx] sería null y el render explota).
+    // Lo manejamos con `descensoTerminado` derivado en el banner.
+    const dst = data.niveles[niObjetivo];
+    if (dst.candidatos.every((c) => c.cosets.length === 0)) return;
     let acc = 0;
     for (let i = 0; i < niObjetivo; i++) {
       for (const c of data.niveles[i].candidatos) {
@@ -921,10 +956,10 @@ export function StauduharPage({ onBack }: Props) {
                 <div className="stat-pills">
                   <PillGrupo
                     label="Nivel"
-                    nombre={nivelActual.grupo_actual_latex}
-                    orden={nivelActual.grupo_actual_orden}
+                    nombre={nivelPillNombre}
+                    orden={nivelPillOrden}
                     grado={data!.grado}
-                    info={nivelActual.grupo_actual_info ?? null}
+                    info={nivelPillInfo}
                     completo={!!grupoFinalAlcanzado}
                   />
                   <PillGrupo
@@ -1110,7 +1145,17 @@ export function StauduharPage({ onBack }: Props) {
                               Luego{' '}
                               <Tex tex={`\\mathrm{Gal}(f) \\subseteq ${candActual.descender_a}`} />.
                             </p>
-                            {!esUltimoNivel ? (
+                            {descensoTerminado ? (
+                              <p style={{ marginTop: 8 }}>
+                                El catálogo no incluye resolventes para
+                                descender desde{' '}
+                                <Tex tex={candActual.descender_a!} />, así
+                                que el descenso no puede continuar.
+                                El grupo de Galois podría ser{' '}
+                                <Tex tex={candActual.descender_a!} /> o
+                                cualquier subgrupo transitivo contenido en él.
+                              </p>
+                            ) : !esUltimoNivel ? (
                               <button
                                 className="btn"
                                 onClick={() => irANivel(pos.nivelIdx + 1)}

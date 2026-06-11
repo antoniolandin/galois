@@ -313,15 +313,18 @@ body {
 /* Variante "completo": el subgrupo descubierto coincide con el
    grupo de Galois objetivo del polinomio. Verde para indicar
    "ya hemos llegado al final". */
-.stat-pills .pill-est.completo {
+.stat-pills .pill-est.completo,
+.stat-pills .pill-nivel.completo {
   background: rgba(232, 245, 233, 0.96);
   border-color: #66bb6a;
   color: #1b5e20;
 }
-.stat-pills .pill-est.completo .lbl {
+.stat-pills .pill-est.completo .lbl,
+.stat-pills .pill-nivel.completo .lbl {
   color: #2e7d32;
 }
-.stat-pills .pill-est.completo .val {
+.stat-pills .pill-est.completo .val,
+.stat-pills .pill-nivel.completo .val {
   color: #1b5e20;
 }
 .stat-pills .pill-tooltip {
