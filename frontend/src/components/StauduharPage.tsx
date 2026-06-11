@@ -1033,6 +1033,8 @@ export function StauduharPage({ onBack }: Props) {
                   if (len > 60) fs = 22;
                   if (len > 100) fs = 18;
                   if (len > 160) fs = 15;
+                  if (len > 220) fs = 13;
+                  if (len > 300) fs = 12;
                   const fsStyle = { fontSize: fs + 'px' };
                   return (
                     <>
@@ -1086,6 +1088,8 @@ export function StauduharPage({ onBack }: Props) {
                   if (len > 60) fs = 22;
                   if (len > 100) fs = 18;
                   if (len > 160) fs = 15;
+                  if (len > 220) fs = 13;
+                  if (len > 300) fs = 12;
                   const fsStyle = { fontSize: fs + 'px' };
                   return (
                   <>
