@@ -24,6 +24,7 @@ from galois.monodromia import (
 from galois.polinomio import Polinomio, desde_expresion, x5_menos_x_mas_alpha
 from galois.raices import raices_en
 from galois.ramificacion import puntos_de_ramificacion
+from galois.stauduhar import desde_expresion as stauduhar_desde_expresion
 
 from .modelos import (
     Complejo,
@@ -32,6 +33,8 @@ from .modelos import (
     PermutacionResponse,
     PolinomioInfo,
     PolinomioRequest,
+    StauduharRequest,
+    StauduharResponse,
     SubgrupoRequest,
     SubgrupoResponse,
 )
@@ -296,3 +299,21 @@ def grupo(req: SubgrupoRequest) -> SubgrupoResponse:
         grado=req.grado,
         orbitas=orbs,
     )
+
+
+@app.post("/api/stauduhar", response_model=StauduharResponse)
+def stauduhar(req: StauduharRequest) -> StauduharResponse:
+    """Descenso de Stauduhar sobre un polinomio f(x) en Q[x] para
+    grado 3 o 4. Devuelve la traza paso a paso del descenso por
+    discriminante y resolvente cubica, con los polinomios resolventes,
+    sus factorizaciones sobre Q y la decision en cada paso."""
+    try:
+        resultado = stauduhar_desde_expresion(req.expresion, req.grado)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pudo procesar el polinomio: {exc}",
+        ) from exc
+    return StauduharResponse(**resultado)

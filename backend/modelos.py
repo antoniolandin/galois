@@ -146,3 +146,57 @@ class SubgrupoResponse(BaseModel):
     center_order: int | None = None
     composition_factors: list[str] = []
     lattice: Lattice | None = None
+
+
+# -- Stauduhar (caso no parametrico, grado 3 a 5) -------------------
+
+class StauduharRequest(BaseModel):
+    """Polinomio f(x) sobre Q como expresion ('x^4 - 2', 'x**3 - x - 1')
+    y su grado, para el descenso de Stauduhar."""
+
+    expresion: str = Field(..., min_length=1)
+    grado: int = Field(..., ge=3, le=5)
+
+
+class CosetApp(BaseModel):
+    """Aplicacion de un representante pi_i de una clase lateral derecha
+    de G en H sobre el invariante F."""
+
+    idx: int
+    representante_latex: str
+    representante_cycle: list[list[int]]
+    conjugado_y_latex: str
+    conjugado_alpha_latex: str
+    valor_numerico_latex: str
+    valor_es_entero: bool
+
+
+class CandidatoProbado(BaseModel):
+    """Prueba completa de un candidato G en el nivel H actual."""
+
+    subgrupo_latex: str
+    subgrupo_orden: int
+    indice: int
+    invariante_y_latex: str
+    invariante_descripcion: str
+    cosets: list[CosetApp]
+    Q_latex: str
+    Q_factorizacion_latex: str
+    raices_enteras_simples: list[str]
+    descender_a: str | None = None
+    coset_descenso_idx: int | None = None
+    razon: str
+
+
+class NivelDescenso(BaseModel):
+    grupo_actual_latex: str
+    grupo_actual_orden: int
+    candidatos: list[CandidatoProbado]
+    descender_a: str | None = None
+
+
+class StauduharResponse(BaseModel):
+    polinomio_latex: str
+    grado: int
+    niveles: list[NivelDescenso]
+    grupo_final: str
