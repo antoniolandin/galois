@@ -171,6 +171,22 @@ class CosetApp(BaseModel):
     valor_es_entero: bool
 
 
+class GrupoInfo(BaseModel):
+    """Resumen abstracto de un grupo (origen GAP). Todos los campos
+    pueden ser None si GAP no respondió."""
+
+    is_abelian: bool | None = None
+    is_solvable: bool | None = None
+    is_nilpotent: bool | None = None
+    is_perfect: bool | None = None
+    is_simple: bool | None = None
+    is_transitive: bool | None = None
+    is_primitive: bool | None = None
+    tid: int | None = None
+    center_order: int | None = None
+    composition_factors: list[str] = []
+
+
 class CandidatoProbado(BaseModel):
     """Prueba completa de un candidato G en el nivel H actual."""
 
@@ -186,6 +202,7 @@ class CandidatoProbado(BaseModel):
     descender_a: str | None = None
     coset_descenso_idx: int | None = None
     razon: str
+    subgrupo_info: GrupoInfo | None = None
 
 
 class NivelDescenso(BaseModel):
@@ -193,6 +210,7 @@ class NivelDescenso(BaseModel):
     grupo_actual_orden: int
     candidatos: list[CandidatoProbado]
     descender_a: str | None = None
+    grupo_actual_info: GrupoInfo | None = None
 
 
 class StauduharResponse(BaseModel):

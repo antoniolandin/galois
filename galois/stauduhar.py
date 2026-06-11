@@ -19,6 +19,7 @@ cada candidato; el frontend lo anima al cerrarse los k cosets."""
 
 from __future__ import annotations
 
+import functools
 from dataclasses import asdict, dataclass, field
 
 import sympy as sp
@@ -66,6 +67,25 @@ class CandidatoProbado:
     descender_a: str | None                 # nombre del subgrupo o None
     coset_descenso_idx: int | None          # cual π_i dio la raiz entera
     razon: str
+    subgrupo_info: "GrupoInfo | None" = None
+
+
+@dataclass
+class GrupoInfo:
+    """Resumen abstracto de un grupo (S_n, A_n, D_n, V_4, C_n, F_20).
+    Calculado vía GAP a partir de generadores canónicos. None en los
+    campos cuando GAP no responde."""
+
+    is_abelian: bool | None = None
+    is_solvable: bool | None = None
+    is_nilpotent: bool | None = None
+    is_perfect: bool | None = None
+    is_simple: bool | None = None
+    is_transitive: bool | None = None
+    is_primitive: bool | None = None
+    tid: int | None = None
+    center_order: int | None = None
+    composition_factors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -76,6 +96,7 @@ class NivelDescenso:
     grupo_actual_orden: int
     candidatos: list[CandidatoProbado]
     descender_a: str | None
+    grupo_actual_info: GrupoInfo | None = None
 
 
 @dataclass
@@ -365,6 +386,52 @@ ORDENES = {
 }
 
 
+# Generadores canónicos para cada subgrupo transitivo que aparece como
+# nivel o como candidato del descenso. Sirven para llamar a GAP y
+# obtener el resumen abstracto (abeliano, resoluble, etc.) que se
+# muestra en los hovers de las pills.
+GENERADORES_CANONICOS: dict[str, list[Permutation]] = {
+    "S_3": [Permutation([1, 0, 2]), Permutation([1, 2, 0])],
+    "A_3": [Permutation([1, 2, 0])],
+    "S_4": [Permutation([1, 0, 2, 3]), Permutation([1, 2, 3, 0])],
+    "A_4": [Permutation([1, 2, 0, 3]), Permutation([0, 2, 3, 1])],
+    "D_4": [Permutation([1, 2, 3, 0]), Permutation([2, 1, 0, 3])],
+    "V_4": [Permutation([1, 0, 3, 2]), Permutation([2, 3, 0, 1])],
+    "C_4": [Permutation([1, 2, 3, 0])],
+    "S_5": [Permutation([1, 0, 2, 3, 4]), Permutation([1, 2, 3, 4, 0])],
+    "A_5": [Permutation([1, 2, 0, 3, 4]), Permutation([1, 2, 3, 4, 0])],
+    "F_20": [Permutation([1, 2, 3, 4, 0]), Permutation([0, 2, 4, 1, 3])],
+    "D_5": [Permutation([1, 2, 3, 4, 0]), Permutation([4, 3, 2, 1, 0])],
+    "C_5": [Permutation([1, 2, 3, 4, 0])],
+}
+
+
+@functools.lru_cache(maxsize=64)
+def _grupo_info(nombre: str, grado: int) -> GrupoInfo | None:
+    """Devuelve GrupoInfo con los datos de GAP para el grupo `nombre`,
+    visto como subgrupo de S_`grado`. Cachea por (nombre, grado).
+    Devuelve None si GAP no responde o el grupo no está en la tabla."""
+    from .identificacion import identificar_grupo_via_gap
+    gens = GENERADORES_CANONICOS.get(nombre)
+    if gens is None:
+        return None
+    info = identificar_grupo_via_gap(gens, grado)
+    if info is None:
+        return None
+    return GrupoInfo(
+        is_abelian=info.get("is_abelian"),
+        is_solvable=info.get("is_solvable"),
+        is_nilpotent=info.get("is_nilpotent"),
+        is_perfect=info.get("is_perfect"),
+        is_simple=info.get("is_simple"),
+        is_transitive=info.get("is_transitive"),
+        is_primitive=info.get("is_primitive"),
+        tid=info.get("tid"),
+        center_order=info.get("center_order"),
+        composition_factors=list(info.get("composition_factors", [])),
+    )
+
+
 # -- Núcleo del descenso ------------------------------------------
 
 def _calcular_raices(f_poly: sp.Poly) -> list[complex]:
@@ -539,6 +606,7 @@ def _probar_candidato(
         descender_a=descender_a,
         coset_descenso_idx=coset_descenso_idx,
         razon=razon,
+        subgrupo_info=_grupo_info(G_name, n),
     )
 
 
@@ -618,6 +686,7 @@ def _descender(n: int, f_poly: sp.Poly) -> tuple[list[NivelDescenso], str]:
             grupo_actual_orden=ORDENES[H_name],
             candidatos=candidatos_probados,
             descender_a=descender_a,
+            grupo_actual_info=_grupo_info(H_name, n),
         ))
 
         if descender_a is None:
