@@ -1231,18 +1231,8 @@ body {
   font-size: 32px;
   font-weight: 600;
   color: #1a1a1a;
-  margin: 0 0 16px 0;
+  margin: 0;
   letter-spacing: -0.01em;
-}
-.landing-sub {
-  font-size: 15px;
-  line-height: 1.65;
-  color: #555;
-  max-width: 720px;
-  margin: 0 auto;
-}
-.landing-sub .ital {
-  font-style: italic;
 }
 .landing-cards {
   display: grid;
@@ -1256,18 +1246,17 @@ body {
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 10px;
-  padding: 28px 28px 22px 28px;
+  padding: 0;
   text-align: left;
   font-family: inherit;
   cursor: pointer;
+  overflow: hidden;
   transition:
     transform 0.12s ease-out,
     box-shadow 0.12s ease-out,
     border-color 0.12s ease-out;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  min-height: 280px;
 }
 .landing-card:hover {
   transform: translateY(-2px);
@@ -1279,24 +1268,41 @@ body {
 .landing-card-stauduhar:hover {
   border-color: #D55E00;
 }
-.landing-card-eyebrow {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #888;
+.landing-card-visual {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #ffffff;
+  transition: transform 0.4s ease-out;
+}
+.landing-card:hover .landing-card-visual {
+  transform: scale(1.03);
+}
+.landing-card-body {
+  padding: 20px 24px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .landing-card h2 {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
   margin: 0;
   color: #1a1a1a;
 }
+.landing-card-monodromia h2 {
+  color: #0072B2;
+}
+.landing-card-stauduhar h2 {
+  color: #D55E00;
+}
 .landing-card p {
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: #555;
   margin: 0;
-  flex-grow: 1;
 }
 .landing-card p code {
   font-family: var(--font-math, 'Fira Code', monospace);
@@ -1309,14 +1315,6 @@ body {
 .landing-card .ital {
   font-style: italic;
 }
-.landing-card-cta {
-  margin-top: 4px;
-  font-size: 13px;
-  color: #1a1a1a;
-  font-weight: 500;
-}
-.landing-card-monodromia .landing-card-cta { color: #0072B2; }
-.landing-card-stauduhar .landing-card-cta { color: #D55E00; }
 .landing-foot {
   text-align: center;
   font-size: 12px;

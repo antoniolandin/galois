@@ -1,0 +1,37 @@
+<svg viewBox="0 0 400 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Edges (subtle) -->
+  <line x1="200" y1="60" x2="120" y2="135" stroke="#bbb" stroke-width="2"/>
+  <line x1="200" y1="60" x2="280" y2="135" stroke="#D55E00" stroke-width="2.5"/>
+  <line x1="280" y1="135" x2="280" y2="205" stroke="#D55E00" stroke-width="2.5"/>
+  <line x1="280" y1="205" x2="280" y2="275" stroke="#D55E00" stroke-width="2.5"/>
+
+  <!-- S_5 (root) -->
+  <circle cx="200" cy="60" r="26" fill="#ffffff" stroke="#D55E00" stroke-width="2"/>
+  <text x="200" y="68" text-anchor="middle" font-family="'Fira Code', monospace" font-size="16" fill="#1a1a1a">S₅</text>
+
+  <!-- A_5 (left, dimmed) -->
+  <circle cx="120" cy="135" r="22" fill="#ffffff" stroke="#bbb" stroke-width="1.5"/>
+  <text x="120" y="142" text-anchor="middle" font-family="'Fira Code', monospace" font-size="14" fill="#888">A₅</text>
+
+  <!-- F_20 -->
+  <circle cx="280" cy="135" r="22" fill="#ffffff" stroke="#D55E00" stroke-width="2"/>
+  <text x="280" y="142" text-anchor="middle" font-family="'Fira Code', monospace" font-size="14" fill="#1a1a1a">F₂₀</text>
+
+  <!-- D_5 -->
+  <circle cx="280" cy="205" r="22" fill="#ffffff" stroke="#D55E00" stroke-width="2"/>
+  <text x="280" y="212" text-anchor="middle" font-family="'Fira Code', monospace" font-size="14" fill="#1a1a1a">D₅</text>
+
+  <!-- C_5 (target) -->
+  <circle cx="280" cy="275" r="24" fill="#D55E00" stroke="#D55E00" stroke-width="2" filter="url(#glow)"/>
+  <text x="280" y="283" text-anchor="middle" font-family="'Fira Code', monospace" font-size="14" fill="#ffffff">C₅</text>
+</svg>
