@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Spike: superficie de Riemann + Three.js, tiempo real</title>
+<title>spike</title>
 <style>
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
@@ -96,40 +96,23 @@
 </head>
 <body>
 
-<h1>Spike: superficie de Riemann + Three.js, tiempo real</h1>
-
-<p class="info">
-  La superficie es la nube de puntos <code>(Re α, h(x), Im α)</code> con
-  <code>h(x) = Re(x) + 0.5 · Im(x)</code> (misma función altura que la fig 2.8
-  del TFG). Se calcula al cargar con Durand-Kerner, 80×80 muestras × 5 hojas
-  = 32 000 puntos. Arrastra sobre el plano α (izquierda) y los 5 marcadores
-  esféricos se mueven en tiempo real sobre la superficie 3D (derecha).
-  Usa el ratón sobre la vista 3D para girar (orbital) y la rueda para zoom.
-  Si el contador FPS de abajo se mantiene en verde mientras arrastras α y
-  giras la cámara a la vez, la opción B sigue siendo viable también con la
-  capa 3D encima.
-</p>
-
 <div class="grid">
   <div class="pane">
-    <div class="label">Plano α  ·  arrastra aquí</div>
     <canvas id="alpha" width="380" height="380"></canvas>
   </div>
   <div class="pane">
-    <div class="label">Superficie de Riemann  ·  Three.js</div>
     <div id="threejs" style="width: 480px; height: 480px;"></div>
   </div>
 </div>
 
 <div class="stats">
   <div class="fps-block">
-    <div class="fps-label">FPS (media móvil)</div>
+    <div class="fps-label">fps</div>
     <div id="fps-value">--</div>
   </div>
-  <div class="veredicto" id="veredicto">Esperando interacción.</div>
 </div>
 
-<div id="loading">Generando superficie…</div>
+<div id="loading">cargando…</div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -369,12 +352,10 @@ function generateSurface() {
   return { positions, colors, count: idx };
 }
 
-// ====================================================================
-// Three.js setup
-// ====================================================================
+// 3D
 let renderer, scene, camera, controls, rootMeshes = [];
 
-function setupThreeJS(surfData) {
+function setup3D(surfData) {
   const container = document.getElementById('threejs');
   const w = container.clientWidth, hh = container.clientHeight;
 
@@ -448,11 +429,8 @@ function updateMarkers() {
   }
 }
 
-// ====================================================================
-// FPS counter
-// ====================================================================
+// fps
 const fpsEl = document.getElementById('fps-value');
-const verEl = document.getElementById('veredicto');
 let fpsBuffer = [];
 let lastFrameTime = performance.now();
 
@@ -466,19 +444,9 @@ function updateFPS() {
   if (fpsBuffer.length > 30) fpsBuffer.shift();
   const avg = fpsBuffer.reduce((a, b) => a + b, 0) / fpsBuffer.length;
   fpsEl.textContent = avg.toFixed(0);
-  if (avg >= 50) {
-    fpsEl.style.color = '#009E73';
-    verEl.textContent = 'Opción B viable también con 3D: 60 fps sostenidos.';
-    verEl.style.background = '#e8f5e9'; verEl.style.color = '#1b5e20';
-  } else if (avg >= 30) {
-    fpsEl.style.color = '#E69F00';
-    verEl.textContent = 'Marginal con 3D: 30-50 fps. Considerar reducir densidad de la nube.';
-    verEl.style.background = '#fff3e0'; verEl.style.color = '#7c4a00';
-  } else {
-    fpsEl.style.color = '#D55E00';
-    verEl.textContent = 'Insuficiente con 3D: caer a malla LOD o cambiar shader.';
-    verEl.style.background = '#fdecea'; verEl.style.color = '#7a1700';
-  }
+  if (avg >= 50) fpsEl.style.color = '#009E73';
+  else if (avg >= 30) fpsEl.style.color = '#E69F00';
+  else fpsEl.style.color = '#D55E00';
 }
 
 // ====================================================================
@@ -499,7 +467,7 @@ function loop() {
 // ====================================================================
 setTimeout(() => {
   const surfData = generateSurface();
-  setupThreeJS(surfData);
+  setup3D(surfData);
   document.getElementById('loading').style.display = 'none';
   loop();
 }, 50);
