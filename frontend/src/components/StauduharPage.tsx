@@ -9,6 +9,7 @@ import {
   type GrupoInfo,
 } from '../api/client';
 import { Math as Tex } from './Math';
+import { formatFactoresComposicion } from './StatsPills';
 
 interface Props {
   onBack: () => void;
@@ -335,6 +336,15 @@ function Reticulo({
   if (!ret) return null;
   return (
     <svg viewBox="0 0 240 240" width="100%" height="100%">
+      <defs>
+        <filter id="reticulo-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
       {ret.aristas.map(([sub, sup]) => {
         const a = ret.nodos.find((n) => n.nombre === sub)!;
         const b = ret.nodos.find((n) => n.nombre === sup)!;
@@ -349,7 +359,7 @@ function Reticulo({
             x1={a.x} y1={a.y} x2={b.x} y2={b.y}
             stroke={
               esAristaCandidato ? '#D55E00'
-                : enCamino ? '#1a1a1a'
+                : enCamino ? '#D55E00'
                 : '#bbb'
             }
             strokeWidth={esAristaCandidato || enCamino ? 2 : 1}
@@ -368,17 +378,19 @@ function Reticulo({
         let strokeWidth = 1.5;
         let textFill = '#aaa';
         if (esFinal) {
-          // Verde para el grupo final: convención del visor de monodromía.
-          fill = '#009E73'; stroke = '#009E73'; strokeWidth = 2.5; textFill = '#fff';
+          // Bermellón con glow para el grupo final, igual que en la landing.
+          fill = '#D55E00'; stroke = '#D55E00'; strokeWidth = 2.5; textFill = '#fff';
         } else if (esDescartado) {
           // Descartado: rojo claro con X superpuesta.
           fill = '#fbeaea'; stroke = '#c0392b'; strokeWidth = 2; textFill = '#c0392b';
         } else if (esActual) {
-          fill = '#e4e4e8'; stroke = '#1a1a1a'; strokeWidth = 2.5; textFill = '#1a1a1a';
+          // Nivel actual: blanco con borde bermellón grueso (parte del camino).
+          fill = '#fff'; stroke = '#D55E00'; strokeWidth = 2.5; textFill = '#1a1a1a';
         } else if (esCandidato) {
           fill = '#fff'; stroke = '#D55E00'; strokeWidth = 2.5; textFill = '#D55E00';
         } else if (enRuta) {
-          fill = '#e4e4e8'; stroke = '#1a1a1a'; strokeWidth = 1.5; textFill = '#1a1a1a';
+          // Nodo del camino consolidado: blanco con borde bermellón.
+          fill = '#fff'; stroke = '#D55E00'; strokeWidth = 1.8; textFill = '#1a1a1a';
         }
         return (
           <g key={nodo.nombre}>
@@ -386,6 +398,7 @@ function Reticulo({
               cx={nodo.x} cy={nodo.y}
               r={esActual || esCandidato ? 19 : 16}
               fill={fill} stroke={stroke} strokeWidth={strokeWidth}
+              filter={esFinal ? 'url(#reticulo-glow)' : undefined}
             />
             <text
               x={nodo.x} y={nodo.y + 5}
@@ -435,8 +448,6 @@ function PillGrupo(props: {
     b === true ? 'sí' : b === false ? 'no' : '—';
   const centro = (n: number | null | undefined): string =>
     n == null ? '—' : n === 1 ? 'trivial' : String(n);
-  const factores = (fs: string[] | undefined): string =>
-    !fs || fs.length === 0 ? '—' : [...fs].reverse().join(' · ');
   return (
     <span
       className={
@@ -483,7 +494,7 @@ function PillGrupo(props: {
             {info.composition_factors && info.composition_factors.length > 0 && (
               <>
                 <dt>Factores</dt>
-                <dd>{factores(info.composition_factors)}</dd>
+                <dd>{formatFactoresComposicion(info.composition_factors)}</dd>
               </>
             )}
           </dl>

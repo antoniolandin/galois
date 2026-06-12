@@ -20,7 +20,7 @@ interface Props {
 
 const SUB_DIGITS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
 
-function formatEstructura(s: string): string {
+export function formatEstructura(s: string): string {
   let out = s.replace(/C_(\d+)/g, (_, digits: string) => 'ℤ_' + digits);
   out = out.replace(/_(\d+)/g, (_, digits: string) =>
     digits.split('').map((d) => SUB_DIGITS[parseInt(d, 10)]).join(''),
@@ -38,7 +38,7 @@ function formatCenter(orden: number | null | undefined): string {
   return String(orden);
 }
 
-function formatFactoresComposicion(factores: string[] | undefined): string {
+export function formatFactoresComposicion(factores: string[] | undefined): string {
   if (!factores || factores.length === 0) return '—';
   return [...factores].reverse().map(formatEstructura).join(' · ');
 }
