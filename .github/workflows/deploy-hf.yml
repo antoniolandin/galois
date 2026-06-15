@@ -1,0 +1,20 @@
+name: Deploy a Hugging Face Spaces
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  sync:
+    name: Push a HF Spaces
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # HF necesita la historia completa
+
+      - name: Push a HF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git push --force "https://antoniolandin:${HF_TOKEN}@huggingface.co/spaces/antoniolandin/galois" master
