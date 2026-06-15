@@ -374,6 +374,33 @@ def _construir_catalogo():
             "indice 2."
         ),
     }
+    # A_5 -> D_5 : invariante F = sum_i (X_i - X_{i+1 mod 5})^2.
+    # Su estabilizador en S_5 es el grupo de automorfismos del grafo
+    # ciclico C_5, que es exactamente D_5. Como D_5 subset A_5, el
+    # estabilizador en A_5 sigue siendo D_5. Indice [A_5 : D_5] = 6.
+    F_a5_d5 = sum((X5[i] - X5[(i + 1) % 5]) ** 2 for i in range(5))
+    cat[(5, "A_5", "D_5")] = {
+        "F": F_a5_d5,
+        "X": X5,
+        # 6 representantes de las clases laterales izquierdas g * D_5
+        # en A_5 (calculados con sympy.combinatorics).
+        "cosets": [
+            Permutation(4),                     # e
+            Permutation([1, 2, 0, 3, 4]),       # (1 2 3)
+            Permutation([2, 0, 1, 3, 4]),       # (1 3 2)
+            Permutation([2, 0, 3, 4, 1]),       # (1 3 4 5 2)
+            Permutation([0, 1, 3, 4, 2]),       # (3 4 5)
+            Permutation([0, 3, 2, 4, 1]),       # (2 4 5)
+        ],
+        "via_discriminante": False,
+        "descripcion": (
+            r"Invariante $F = \sum_i (y_i - y_{i+1})^2$ con indices mod 5. "
+            "Su estabilizador en $S_5$ es el grupo dihedrico $D_5$ "
+            "(simetrias del pentagono); como $D_5 \\subset A_5$, su "
+            "estabilizador en $A_5$ es tambien $D_5$, con indice 6."
+        ),
+    }
+
     # D_5 -> C_5 : invariante ciclico de grado 3 (Soicher-McKay).
     # Fijado por el 5-ciclo (es ciclico) pero no por la reflexion de D_5.
     F_d5_c5 = (
@@ -416,7 +443,7 @@ DESCENSOS = {
     },
     5: {
         "S_5": ["A_5", "F_20"],
-        "A_5": [],          # A_5 simple, no descenso util en visor
+        "A_5": ["D_5"],     # D_5 es subgrupo transitivo maximal de A_5
         "F_20": ["D_5"],
         "D_5": ["C_5"],
         "C_5": [],
