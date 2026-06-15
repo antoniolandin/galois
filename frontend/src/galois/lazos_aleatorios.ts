@@ -76,6 +76,13 @@ export function generarLazoAleatorio(
       ? 0.5
       : Math.max(...ramificacion.map((b) => Math.hypot(b[0], b[1])));
   const R_DISCO = Math.max(0.6, maxRamif * FACTOR_RADIO);
+  // Las constantes de paso/margen se calibraron para |ramif| ≈ 0.5.
+  // Para polinomios con ramificación más lejana (p.ej. x^5 + 5x + α
+  // tiene |ramif| ≈ 4) hay que escalarlas en proporción, si no la
+  // caminata recorre un trozo despreciable del plano.
+  const escala = Math.max(maxRamif / 0.5, 1);
+  const stepSize = STEP_SIZE * escala;
+  const margenBranch = MARGEN_BRANCH * escala;
 
   const lazo: Complex[] = [alphaEstrella];
   let cur = alphaEstrella;
@@ -85,11 +92,11 @@ export function generarLazoAleatorio(
     for (let intento = 0; intento < INTENTOS_POR_PASO; intento++) {
       const ang = Math.random() * 2 * Math.PI;
       const candidato: Complex = [
-        cur[0] + STEP_SIZE * Math.cos(ang),
-        cur[1] + STEP_SIZE * Math.sin(ang),
+        cur[0] + stepSize * Math.cos(ang),
+        cur[1] + stepSize * Math.sin(ang),
       ];
       if (Math.hypot(candidato[0], candidato[1]) > R_DISCO) continue;
-      if (!lejosDeBranches(candidato, ramificacion, MARGEN_BRANCH)) continue;
+      if (!lejosDeBranches(candidato, ramificacion, margenBranch)) continue;
       avanzado = candidato;
       break;
     }
@@ -107,7 +114,7 @@ export function generarLazoAleatorio(
   const dx = alphaEstrella[0] - cur[0];
   const dy = alphaEstrella[1] - cur[1];
   const distFinal = Math.hypot(dx, dy);
-  const nCierre = Math.max(1, Math.ceil(distFinal / STEP_SIZE));
+  const nCierre = Math.max(1, Math.ceil(distFinal / stepSize));
   for (let k = 1; k <= nCierre; k++) {
     const t = k / nCierre;
     lazo.push([cur[0] + dx * t, cur[1] + dy * t]);

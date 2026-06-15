@@ -83,20 +83,13 @@ function baseRPolinomio(
   return Math.max(r, 0.6);
 }
 
-function computarMundo(
-  baseRFijo: number,
-  altRFijo: number,
-): { baseR: number; altR: number } {
-  // Cap relativo: el cubo nunca queda más de un 60 % más alto que
-  // ancho, para que polinomios donde las raíces crecen como
-  // |α|^{1/n} (p.ej. x^4 − α) no acaben con una caja desproporcionada
-  // hacia arriba.
+function computarMundo(baseRFijo: number): { baseR: number; altR: number } {
+  // Cubo siempre cúbico (altR = baseR). El rango de altura real de
+  // las raíces puede ser menor — la banda de datos queda dentro del
+  // cubo con margen — pero el wireframe mantiene volumen 3D constante
+  // independientemente del polinomio.
   const baseR = Math.max(baseRFijo * 1.15, 0.6);
-  const altCap = baseR * 1.6;
-  return {
-    baseR,
-    altR: Math.max(Math.min(altRFijo * 1.15, altCap), 1.0),
-  };
+  return { baseR, altR: baseR };
 }
 
 export function Trayectorias3D({
@@ -127,14 +120,16 @@ export function Trayectorias3D({
     () => baseRPolinomio(ramificacion, alphaEstrella),
     [ramificacion, alphaEstrella],
   );
-  // Sonda de raíces sobre una rejilla del plano α al cargar la
-  // página: ~30 evaluaciones de Durand-Kerner, gratis. Da el rango
-  // natural de h(x_k) que el lazo ampliará después si hace falta.
-  const altRFijo = useMemo(() => altMaxPolinomio(baseRFijo), [baseRFijo]);
-  const mundo = useMemo(
-    () => computarMundo(baseRFijo, altRFijo),
-    [baseRFijo, altRFijo],
-  );
+  const mundo = useMemo(() => computarMundo(baseRFijo), [baseRFijo]);
+  // Escala vertical: el rango natural de h(x) puede ser mucho menor
+  // que el lado del cubo (cúbico). Multiplicamos h por este factor en
+  // todas las proyecciones para que la superficie ocupe verticalmente
+  // el cubo en lugar de quedar como una banda plana en el medio.
+  const escalaH = useMemo(() => {
+    const altNatural = altMaxPolinomio(baseRFijo);
+    if (altNatural < 1e-6) return 1;
+    return mundo.altR / altNatural;
+  }, [baseRFijo, mundo.altR]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -165,7 +160,14 @@ export function Trayectorias3D({
     ctx.clearRect(0, 0, w, h);
 
     const { baseR, altR } = mundo;
-    const proj = (p: Vec3) => project(p, cam, w, h);
+    // Para polinomios con ramificación lejana (p.ej. x^5 + 5x + α
+    // tiene |ramif| ≈ 4), el cubo crece pero cam.d sigue en su valor
+    // por defecto: la cámara queda dentro del cubo. Escalamos d
+    // proporcionalmente cuando baseRFijo supera el umbral en que la
+    // cámara por defecto deja de contener el cubo.
+    const escala = Math.max(baseRFijo / 2, 1);
+    const camEscalada: CamState = { ...cam, d: cam.d * escala };
+    const proj = (p: Vec3) => project(p, camEscalada, w, h);
 
     // === Caja delimitadora wireframe ===
     const corners: Vec3[] = [
@@ -294,7 +296,7 @@ export function Trayectorias3D({
         // Punto inicial: arrancamos en (startAlpha, altura(startRoot))
         const a0 = lazo[0];
         const r0 = startRoots[k] ?? INITIAL_ROOTS[k];
-        const p0 = proj([a0[0], a0[1], altura(r0)]);
+        const p0 = proj([a0[0], a0[1], altura(r0) * escalaH]);
         if (p0) {
           ctx.moveTo(p0.sx, p0.sy);
           started = true;
@@ -303,7 +305,7 @@ export function Trayectorias3D({
           const a = lazo[i + 1];
           const r = trayectorias[k][i];
           if (!a || !r) continue;
-          const p = proj([a[0], a[1], altura(r)]);
+          const p = proj([a[0], a[1], altura(r) * escalaH]);
           if (!p) {
             started = false;
             continue;
@@ -329,7 +331,7 @@ export function Trayectorias3D({
       ctx.lineWidth = 1.4;
       for (let k = 0; k < startRoots.length; k++) {
         const r = startRoots[k];
-        const p = proj([aStart[0], aStart[1], altura(r)]);
+        const p = proj([aStart[0], aStart[1], altura(r) * escalaH]);
         if (!p) continue;
         ctx.beginPath();
         ctx.arc(p.sx, p.sy, 5, 0, 2 * Math.PI);
@@ -342,7 +344,7 @@ export function Trayectorias3D({
     const items: Array<{ k: number; sx: number; sy: number; depth: number }> = [];
     for (let k = 0; k < roots.length; k++) {
       const r = roots[k];
-      const p = proj([aNow[0], aNow[1], altura(r)]);
+      const p = proj([aNow[0], aNow[1], altura(r) * escalaH]);
       if (!p) continue;
       items.push({ k, sx: p.sx, sy: p.sy, depth: p.depth });
     }

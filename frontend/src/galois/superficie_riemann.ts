@@ -148,18 +148,33 @@ export function computarMallaRiemann(N: number, baseR: number): MallaRiemann {
     }
   }
 
+  // Techo absoluto para descartar las divergencias de Durand-Kerner:
+  // en los alphas de las esquinas del cuadrado [-baseR, baseR]^2 las
+  // INITIAL_ROOTS calibradas en alpha = 0 pueden estar muy lejos de
+  // las verdaderas raices y el iterador se dispara. Sin este filtro,
+  // la malla pinta puntos a alturas absurdas que rompen la escala
+  // visual del cubo.
+  const TECHO = 12;
   const roots: Complex[][] = new Array(total);
   for (let idx = 0; idx < total; idx++) {
     const rs = durandKerner(alphas[idx], INITIAL_ROOTS as unknown as Complex[]);
+    for (let k = 0; k < rs.length; k++) {
+      const r = rs[k];
+      const h = Math.abs(r[0] + 0.5 * r[1]);
+      if (!Number.isFinite(h) || h > TECHO) {
+        // Marcador de "no convergio": el renderer salta el punto.
+        rs[k] = [NaN, NaN];
+      }
+    }
     roots[idx] = reordenarPorProximidad(rs);
   }
 
   // Garantía: si por alguna razón la asignación quedó incompleta
-  // (no debería con n=DEGREE), rellenar con el origen para que el
-  // wireframe no pinte basura.
+  // (no debería con n=DEGREE), rellenar con NaN para que el renderer
+  // tampoco pinte basura.
   for (let idx = 0; idx < total; idx++) {
     for (let k = 0; k < DEGREE; k++) {
-      if (!roots[idx][k]) roots[idx][k] = [0, 0];
+      if (!roots[idx][k]) roots[idx][k] = [NaN, NaN];
     }
   }
 

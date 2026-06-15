@@ -52,8 +52,12 @@ interface Props {
   disabled?: boolean;
 }
 
-// Tolerancia para considerar que α ha vuelto al punto de inicio del lazo.
-const CLOSE_TOL = 0.05;
+// Tolerancia relativa para considerar que α ha vuelto al punto de
+// inicio del lazo: 2 % del lado del canvas en unidades de mundo. Si
+// fuera constante, para polinomios con ramificación lejana (p.ej.
+// x^5 + 5x + α tiene |ramif| ≈ 4 y RANGE ≈ 12) el usuario tendría
+// que acertar el punto base con precisión sub-pixel.
+const CLOSE_TOL_FRAC = 0.02;
 
 export function PlanoAlpha({
   ramificacion,
@@ -285,7 +289,7 @@ export function PlanoAlpha({
     // inducida no es la identidad.  Sólo entonces se guarda como
     // generador y la visualización persiste.
     const dist = cAbs(cSub(alphaRef.current, startAlphaRef.current));
-    const cerrado = dist < CLOSE_TOL;
+    const cerrado = dist < CLOSE_TOL_FRAC * 2 * RANGE;
     let utile = false;
     if (cerrado) {
       const sigma = emparejarPorProximidad(

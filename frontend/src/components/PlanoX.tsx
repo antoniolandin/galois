@@ -3,9 +3,10 @@
 // que ha recorrido durante el lazo actual se traza como una línea
 // del mismo color con baja opacidad.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { cAbs } from '../galois/complex';
 import type { Complex } from '../galois/complex';
-import { BRANCH_X, ROOT_COLORS, DEGREE } from '../galois/polinomio';
+import { BRANCH_X, INITIAL_ROOTS, ROOT_COLORS, DEGREE } from '../galois/polinomio';
 
 interface Props {
   roots: Complex[];
@@ -16,16 +17,34 @@ interface Props {
   trayectorias: Complex[][];
 }
 
-// Rango del plano x: span [-RANGE, +RANGE].  Más pequeño hace que
-// los lazos pequeños alrededor de cada raíz se aprecien mejor.
-const RANGE = 1.15;
+// Rango por defecto del plano x cuando las raíces caben holgadamente
+// dentro de un disco de radio 1. Los polinomios con coeficientes
+// grandes en x (p.ej. x^5 + 5x + α tiene |raíces| ≈ 1.49) excederían
+// este rango, por eso se recalcula en función de las raíces iniciales.
+const RANGE_DEFAULT = 1.15;
 
-const xToCanvas = (z: Complex, w: number, h: number): [number, number] => [
-  ((z[0] + RANGE) / (2 * RANGE)) * w,
-  ((-z[1] + RANGE) / (2 * RANGE)) * h,
+const xToCanvas = (
+  z: Complex,
+  w: number,
+  h: number,
+  range: number,
+): [number, number] => [
+  ((z[0] + range) / (2 * range)) * w,
+  ((-z[1] + range) / (2 * range)) * h,
 ];
 
 export function PlanoX({ roots, startRoots, trayectorias }: Props) {
+  // Rango dinámico: el máximo entre el valor por defecto (que conserva
+  // el aspecto familiar para polinomios pequeños) y 1.3 veces el módulo
+  // mayor de las raíces iniciales. El factor 1.3 deja margen para los
+  // lazos que se aleja un poco del entorno de cada raíz.
+  const RANGE = useMemo(() => {
+    const maxR =
+      INITIAL_ROOTS.length === 0 ? 0 : Math.max(...INITIAL_ROOTS.map(cAbs));
+    const maxBX =
+      BRANCH_X.length === 0 ? 0 : Math.max(...BRANCH_X.map(cAbs));
+    return Math.max(RANGE_DEFAULT, Math.max(maxR, maxBX) * 1.3);
+  }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Dimensiones CSS del canvas. Las llevamos en state para que un
   // cambio de tamaño dispare el useEffect de dibujo, y no quede el
@@ -66,7 +85,7 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
     ctx.strokeStyle = '#e8e8eb';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    const c = xToCanvas([0, 0], w, h);
+    const c = xToCanvas([0, 0], w, h, RANGE);
     ctx.moveTo(0, c[1]);
     ctx.lineTo(w, c[1]);
     ctx.moveTo(c[0], 0);
@@ -81,7 +100,7 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
     ctx.strokeStyle = '#1a1a1a';
     ctx.lineWidth = 1.4;
     for (const bx of BRANCH_X) {
-      const [px, py] = xToCanvas(bx, w, h);
+      const [px, py] = xToCanvas(bx, w, h, RANGE);
       ctx.beginPath();
       ctx.arc(px, py, 6, 0, 2 * Math.PI);
       ctx.fill();
@@ -101,7 +120,7 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
       ctx.strokeStyle = '#cccccc';
       ctx.lineWidth = 1;
       for (const r0 of startRoots) {
-        const [px, py] = xToCanvas(r0, w, h);
+        const [px, py] = xToCanvas(r0, w, h, RANGE);
         ctx.beginPath();
         ctx.arc(px, py, 7, 0, 2 * Math.PI);
         ctx.stroke();
@@ -117,10 +136,10 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
         ctx.strokeStyle = ROOT_COLORS[k];
         ctx.globalAlpha = 0.75;
         ctx.beginPath();
-        const p0 = xToCanvas(traj[0], w, h);
+        const p0 = xToCanvas(traj[0], w, h, RANGE);
         ctx.moveTo(p0[0], p0[1]);
         for (let i = 1; i < traj.length; i++) {
-          const p = xToCanvas(traj[i], w, h);
+          const p = xToCanvas(traj[i], w, h, RANGE);
           ctx.lineTo(p[0], p[1]);
         }
         ctx.stroke();
@@ -132,7 +151,7 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
     ctx.strokeStyle = '#1a1a1a';
     ctx.lineWidth = 1.4;
     for (let k = 0; k < roots.length; k++) {
-      const [px, py] = xToCanvas(roots[k], w, h);
+      const [px, py] = xToCanvas(roots[k], w, h, RANGE);
       ctx.fillStyle = ROOT_COLORS[k];
       ctx.beginPath();
       ctx.arc(px, py, 7, 0, 2 * Math.PI);
@@ -144,7 +163,7 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
     // Se intenta poner en la esquina superior derecha de la raíz;
     // si se saldría del canvas, se voltea por el eje correspondiente.
     if (hoveredIdx != null && hoveredIdx < roots.length) {
-      const [rx, ry] = xToCanvas(roots[hoveredIdx], w, h);
+      const [rx, ry] = xToCanvas(roots[hoveredIdx], w, h, RANGE);
       const text = String(hoveredIdx);
       ctx.font = 'bold 13px "Manrope", -apple-system, sans-serif';
       ctx.textBaseline = 'middle';
@@ -186,7 +205,7 @@ export function PlanoX({ roots, startRoots, trayectorias }: Props) {
     let best = -1;
     let bestDist = 12;
     for (let k = 0; k < roots.length; k++) {
-      const [rx, ry] = xToCanvas(roots[k], rect.width, rect.height);
+      const [rx, ry] = xToCanvas(roots[k], rect.width, rect.height, RANGE);
       const dx = mx - rx;
       const dy = my - ry;
       const d = Math.sqrt(dx * dx + dy * dy);

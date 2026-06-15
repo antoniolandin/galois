@@ -421,18 +421,11 @@ function baseRPolinomio(ramificacion: Complex[]): number {
 // (no del lazo). Si el usuario dibuja un lazo que se sale, las
 // curvas se ven fuera del cubo — pero el cubo no se reescala, así
 // que la cámara y la sensación espacial permanecen estables.
-function computarMundo(
-  baseRFijo: number,
-  altRFijo: number,
-): { baseR: number; altR: number } {
-  // Mismo cap relativo que en la vista de trayectorias: el cubo
-  // no puede ser más de un 60 % más alto que ancho.
+function computarMundo(baseRFijo: number): { baseR: number; altR: number } {
+  // Cubo siempre cúbico (altR = baseR). Mismo razonamiento que en
+  // Trayectorias3D.
   const baseR = Math.max(baseRFijo * 1.15, 0.6);
-  const altCap = baseR * 1.6;
-  return {
-    baseR,
-    altR: Math.max(Math.min(altRFijo * 1.15, altCap), 1.2),
-  };
+  return { baseR, altR: baseR };
 }
 
 export function SuperficieRiemann({
@@ -465,15 +458,16 @@ export function SuperficieRiemann({
   const projectedRef = useRef<Array<{ k: number; sx: number; sy: number; depth: number }>>([]);
 
   const baseRFijo = useMemo(() => baseRPolinomio(ramificacion), [ramificacion]);
-  // Sonda de raíces sobre una rejilla del plano α (al cargar la
-  // página). Da una cota razonable del rango vertical de la
-  // superficie de Riemann sin esperar a que el usuario dibuje un
-  // lazo amplio. ~30 evaluaciones de Durand-Kerner, despreciable.
-  const altRFijo = useMemo(() => altMaxPolinomio(baseRFijo), [baseRFijo]);
-  const mundo = useMemo(
-    () => computarMundo(baseRFijo, altRFijo),
-    [baseRFijo, altRFijo],
-  );
+  const mundo = useMemo(() => computarMundo(baseRFijo), [baseRFijo]);
+  // Escala vertical aplicada a la coordenada Z de las raíces para
+  // que la superficie de Riemann ocupe todo el cubo en lugar de
+  // colapsar en una banda fina cuando el rango natural de h(x) es
+  // mucho menor que el lado del cubo.
+  const escalaH = useMemo(() => {
+    const altNatural = altMaxPolinomio(baseRFijo);
+    if (altNatural < 1e-6) return 1;
+    return mundo.altR / altNatural;
+  }, [baseRFijo, mundo.altR]);
 
   // Malla precomputada: usa el `baseR` del polinomio (no el del
   // cubo adaptativo) para no recomputar Durand-Kerner cada vez que
@@ -573,7 +567,12 @@ export function SuperficieRiemann({
       proj = (p: Vec3) =>
         projectFromLookAt(p, camPos, target, w, h, upLocal);
     } else {
-      proj = (p: Vec3) => project(p, cam, w, h);
+      // Mismo razonamiento que en Trayectorias3D: si baseRFijo es
+      // mayor que el umbral en el que la cámara por defecto deja de
+      // contener el cubo, escalamos d proporcionalmente.
+      const escala = Math.max(baseRFijo / 2, 1);
+      const camEscalada: CamState = { ...cam, d: cam.d * escala };
+      proj = (p: Vec3) => project(p, camEscalada, w, h);
     }
     const enPOV = cameraMode === 'pov';
 
@@ -696,14 +695,14 @@ export function SuperficieRiemann({
             if (!tri1OK && !tri2OK) continue;
             const a00 = malla.alphas[id00];
             const a11 = malla.alphas[id11];
-            const z00 = altura(r00);
-            const z11 = altura(r11);
+            const z00 = altura(r00) * escalaH;
+            const z11 = altura(r11) * escalaH;
             const p00 = proj([a00[0], a00[1], z00]);
             const p11 = proj([a11[0], a11[1], z11]);
             if (!p00 || !p11) continue;
             if (tri1OK) {
               const a10 = malla.alphas[id10];
-              const z10 = altura(r10);
+              const z10 = altura(r10) * escalaH;
               const p10 = proj([a10[0], a10[1], z10]);
               if (p10) {
                 const c1 =
@@ -720,7 +719,7 @@ export function SuperficieRiemann({
             }
             if (tri2OK) {
               const a01 = malla.alphas[id01];
-              const z01 = altura(r01);
+              const z01 = altura(r01) * escalaH;
               const p01 = proj([a01[0], a01[1], z01]);
               if (p01) {
                 const c2 =
@@ -762,7 +761,7 @@ export function SuperficieRiemann({
           const pts: Array<{ sx: number; sy: number; depth: number } | null> = [];
           const a0 = lazo[0];
           const r0 = startRoots[k] ?? INITIAL_ROOTS[k];
-          pts.push(proj([a0[0], a0[1], altura(r0)]));
+          pts.push(proj([a0[0], a0[1], altura(r0) * escalaH]));
           for (let i = 0; i < numPasos; i++) {
             const a = lazo[i + 1];
             const r = trayectorias[k][i];
@@ -770,7 +769,7 @@ export function SuperficieRiemann({
               pts.push(null);
               continue;
             }
-            pts.push(proj([a[0], a[1], altura(r)]));
+            pts.push(proj([a[0], a[1], altura(r) * escalaH]));
           }
           // Acumular en tramos respetando los huecos (puntos null).
           let buffer: Array<{ sx: number; sy: number; depth: number }> = [];
@@ -845,8 +844,9 @@ export function SuperficieRiemann({
         ctx.globalAlpha = nubeAlpha;
         for (let idx = 0; idx < total; idx++) {
           const r = malla.roots[idx][k];
+          if (!Number.isFinite(r[0])) continue;
           const a = malla.alphas[idx];
-          const p = proj([a[0], a[1], altura(r)]);
+          const p = proj([a[0], a[1], altura(r) * escalaH]);
           if (!p) continue;
           ctx.fillRect(p.sx - half, p.sy - half, TAM_PUNTO_PX, TAM_PUNTO_PX);
         }
@@ -884,7 +884,7 @@ export function SuperficieRiemann({
         let hayPunto = false;
         const a0 = lazo[0];
         const r0 = startRoots[k] ?? INITIAL_ROOTS[k];
-        const p0 = proj([a0[0], a0[1], altura(r0)]);
+        const p0 = proj([a0[0], a0[1], altura(r0) * escalaH]);
         if (p0) {
           path.moveTo(p0.sx, p0.sy);
           started = true;
@@ -894,7 +894,7 @@ export function SuperficieRiemann({
           const a = lazo[i + 1];
           const r = trayectorias[k][i];
           if (!a || !r) continue;
-          const p = proj([a[0], a[1], altura(r)]);
+          const p = proj([a[0], a[1], altura(r) * escalaH]);
           if (!p) {
             started = false;
             continue;
@@ -932,7 +932,7 @@ export function SuperficieRiemann({
       for (let k = 0; k < startRoots.length; k++) {
         if (enPOV && k === povIdx) continue;
         const r = startRoots[k];
-        const p = proj([aStart[0], aStart[1], altura(r)]);
+        const p = proj([aStart[0], aStart[1], altura(r) * escalaH]);
         if (!p) continue;
         ctx.beginPath();
         ctx.arc(p.sx, p.sy, 5, 0, 2 * Math.PI);
@@ -948,7 +948,7 @@ export function SuperficieRiemann({
     for (let k = 0; k < roots.length; k++) {
       if (enPOV && k === povIdx) continue;
       const r = roots[k];
-      const p = proj([currentAlpha[0], currentAlpha[1], altura(r)]);
+      const p = proj([currentAlpha[0], currentAlpha[1], altura(r) * escalaH]);
       if (!p) continue;
       items.push({ k, sx: p.sx, sy: p.sy, depth: p.depth });
     }
