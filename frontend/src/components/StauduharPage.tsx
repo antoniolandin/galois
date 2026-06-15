@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
-import katex from 'katex';
 import {
   postStauduhar,
   type StauduharResponse,
   type CandidatoProbado,
-  type CosetApp,
   type GrupoInfo,
 } from '../api/client';
 import { Math as Tex } from './Math';
@@ -53,11 +51,6 @@ function deducirGrado(expr: string): 3 | 4 | 5 {
   return 5;
 }
 
-function renderInlineMath(s: string): string {
-  return s.replace(/\\\((.+?)\\\)/g, (_, tex) =>
-    katex.renderToString(tex, { throwOnError: false, displayMode: false }),
-  );
-}
 
 // Render mini: parsea LaTeX simple (\alpha_{N}, y_{N}, exponentes,
 // productos, paréntesis \left \right, raíces, i imaginario) y devuelve
@@ -126,7 +119,7 @@ function texGrupo(nombre: string): string {
   return nombre.replace(/_(\d+)/, '_{$1}');
 }
 
-function renderGroupName(latex: string): JSX.Element {
+function renderGroupName(latex: string): ReactElement {
   const s = latex
     .replace(/\\mathrm\{([^}]+)\}/g, '$1')
     .replace(/\\mathbb\{([^}]+)\}/g, '$1');
@@ -138,12 +131,12 @@ function renderGroupName(latex: string): JSX.Element {
 }
 
 // Render Fira Code para representantes de coset: "e", "(1 2)", "(1 2 3)".
-function renderCoset(latex: string): JSX.Element {
+function renderCoset(latex: string): ReactElement {
   // \  en LaTeX es un espacio
   return <span>{latex.replace(/\\\s/g, ' ').replace(/\\ /g, ' ')}</span>;
 }
 
-function renderExpr(latex: string): JSX.Element {
+function renderExpr(latex: string): ReactElement {
   // Normalizamos partes visuales antes del parser.
   const s = latex
     .replace(/\\left\(/g, '(')
@@ -155,7 +148,7 @@ function renderExpr(latex: string): JSX.Element {
     .replace(/\\pi(?![a-zA-Z])/g, 'π')
     .replace(/\\sqrt\{(\d+)\}/g, '√$1');
 
-  const out: JSX.Element[] = [];
+  const out: ReactElement[] = [];
   let i = 0;
   let key = 0;
   while (i < s.length) {

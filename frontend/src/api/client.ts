@@ -12,6 +12,8 @@ export interface PolinomioInfo {
   alpha_estrella: ComplejoJSON;
   puntos_de_ramificacion: ComplejoJSON[];
   raices_base: ComplejoJSON[];
+  branch_x: ComplejoJSON[];
+  coefs_alpha: ComplejoJSON[][];
 }
 
 export interface LatticeNodo {
