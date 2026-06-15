@@ -175,27 +175,36 @@ def set_polinomio(req: PolinomioRequest) -> PolinomioInfo:
     x_sym, alpha_sym = sp.symbols("x alpha")
     try:
         expr = sp.sympify(expr_str, locals={"x": x_sym, "alpha": alpha_sym})
-    except (sp.SympifyError, SyntaxError, TypeError) as e:
-        raise HTTPException(status_code=400, detail=f"Sintaxis invalida: {e}")
+    except (sp.SympifyError, SyntaxError, TypeError):
+        raise HTTPException(status_code=400, detail="Sintaxis invalida en la expresion.")
     libres = expr.free_symbols
     if x_sym not in libres:
         raise HTTPException(status_code=400, detail="La expresion debe contener la variable x.")
     if alpha_sym not in libres:
-        raise HTTPException(status_code=400, detail="La expresion debe contener la variable alpha (α).")
+        raise HTTPException(status_code=400, detail="La expresion debe contener la variable α.")
     extras = libres - {x_sym, alpha_sym}
     if extras:
         nombres = ", ".join(sorted(str(s) for s in extras))
         raise HTTPException(
             status_code=400,
-            detail=f"Solo se permiten las variables x y alpha; sobran: {nombres}.",
+            detail=f"Solo se permiten las variables x y α; sobran: {nombres}.",
         )
     try:
         P_nuevo = desde_expresion(expr)
     except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No es un polinomio valido en x con coeficientes en C[alpha]: {e}",
-        )
+        msg = str(e)
+        # Errores frecuentes de sympy traducidos a castellano. El resto
+        # se reportan literales para que el usuario tenga algo a mano.
+        if "contains an element of the set of generators" in msg:
+            detalle = (
+                "La expresion debe ser polinomica en x: solo se permiten "
+                "potencias enteras no negativas (x, x^2, ..., no 1/x ni x^(1/2))."
+            )
+        elif "must be a Symbol" in msg or "must be a polynomial" in msg:
+            detalle = "La expresion no es un polinomio en x."
+        else:
+            detalle = f"No se reconoce como polinomio en x con coeficientes en C[α] ({msg})."
+        raise HTTPException(status_code=400, detail=detalle)
     P = P_nuevo
     RAMIFICACION = puntos_de_ramificacion(P)
     ALPHA_ESTRELLA = _elegir_alpha_estrella(RAMIFICACION)
