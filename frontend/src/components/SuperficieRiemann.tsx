@@ -573,12 +573,7 @@ export function SuperficieRiemann({
       proj = (p: Vec3) =>
         projectFromLookAt(p, camPos, target, w, h, upLocal);
     } else {
-      // Mismo razonamiento que en Trayectorias3D: si baseRFijo es
-      // mayor que el umbral en el que la cámara por defecto deja de
-      // contener el cubo, escalamos d proporcionalmente.
-      const escala = Math.max(baseRFijo / 2, 1);
-      const camEscalada: CamState = { ...cam, d: cam.d * escala };
-      proj = (p: Vec3) => project(p, camEscalada, w, h);
+      proj = (p: Vec3) => project(p, cam, w, h);
     }
     const enPOV = cameraMode === 'pov';
 

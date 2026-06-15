@@ -165,14 +165,7 @@ export function Trayectorias3D({
     ctx.clearRect(0, 0, w, h);
 
     const { baseR, altR } = mundo;
-    // Si el cubo es grande (polinomios con ramificación lejana del
-    // origen, p.ej. x^5 + 5x + α tiene |ramif| ≈ 4), la cámara con
-    // d=4.2 queda dentro del cubo y la cara inferior llena la pantalla.
-    // Escalamos d proporcionalmente al tamaño cuando éste excede el
-    // umbral en el que el ajuste por defecto deja de funcionar.
-    const escala = Math.max(baseRFijo / 2, 1);
-    const camEscalada: CamState = { ...cam, d: cam.d * escala };
-    const proj = (p: Vec3) => project(p, camEscalada, w, h);
+    const proj = (p: Vec3) => project(p, cam, w, h);
 
     // === Caja delimitadora wireframe ===
     const corners: Vec3[] = [
