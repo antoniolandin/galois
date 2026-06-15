@@ -61,7 +61,7 @@ function derivCoefsAlpha(coefs: Complex[]): Complex[] {
 
 // === Bindings exportados ===
 // P = sum_k a_k(alpha) * x^k (Horner en x).
-export let P = (x: Complex, alpha: Complex): Complex => {
+export const P = (x: Complex, alpha: Complex): Complex => {
   let r: Complex = [0, 0];
   for (const cs of _coefsAlpha) {
     const ak = evalEnAlpha(cs, alpha);
@@ -70,7 +70,7 @@ export let P = (x: Complex, alpha: Complex): Complex => {
   return r;
 };
 // ∂P/∂x = sum_{k≥1} k · a_k(alpha) · x^{k−1} (Horner en x).
-export let Px = (x: Complex, alpha?: Complex): Complex => {
+export const Px = (x: Complex, alpha?: Complex): Complex => {
   const a = alpha ?? ([0, 0] as Complex);
   let r: Complex = [0, 0];
   const n = _coefsAlpha.length - 1;
@@ -83,7 +83,7 @@ export let Px = (x: Complex, alpha?: Complex): Complex => {
   return r;
 };
 // ∂P/∂α = sum_k (da_k/dalpha)(alpha) · x^k.
-export let Pa = (x?: Complex, alpha?: Complex): Complex => {
+export const Pa = (x?: Complex, alpha?: Complex): Complex => {
   const xx = x ?? ([0, 0] as Complex);
   const a = alpha ?? ([0, 0] as Complex);
   let r: Complex = [0, 0];
