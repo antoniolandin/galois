@@ -13,7 +13,7 @@
 // constantes anteriores ya estarán fuera de uso al remontar.
 
 import type { Complex } from './complex';
-import { cAdd, cMul } from './complex';
+import { cAdd, cDiv, cMul } from './complex';
 
 interface ComplejoJSON {
   re: number;
@@ -151,6 +151,18 @@ export function setPolinomioRuntime(info: PolinomioRuntimeInfo): void {
   _coefsAlpha = info.coefs_alpha.map((cs) =>
     cs.map(({ re, im }) => [re, im] as Complex),
   );
+  // Normalizamos a forma monica dividiendo todos los coeficientes por
+  // a_n (el lider). El frontend usa Durand-Kerner para la malla y
+  // raices puntuales, y la formula clasica de DK solo converge sobre
+  // polinomios monicos: con a_n != 1, las iteraciones se desvian
+  // por un factor a_n en cada paso. Solo se normaliza cuando a_n es
+  // constante en alpha (longitud 1); si depende de alpha (raro) se
+  // deja como esta.
+  const an = _coefsAlpha[0];
+  if (an.length === 1 && (an[0][0] !== 1 || an[0][1] !== 0)) {
+    const lider = an[0];
+    _coefsAlpha = _coefsAlpha.map((cs) => cs.map((c) => cDiv(c, lider)));
+  }
   DEGREE = info.grado;
   BRANCH_X = info.branch_x.map(({ re, im }) => [re, im] as Complex);
   const raw: Complex[] = info.raices_base.map(
