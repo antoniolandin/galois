@@ -88,7 +88,7 @@ function reordenarPorProximidad(rs: Complex[]): Complex[] {
   }
   pares.sort((a, b) => a.d - b.d);
   const usadaI = new Array<boolean>(n).fill(false);
-  for (const { i, j, d: _d } of pares) {
+  for (const { i, j } of pares) {
     if (usadaI[i] || tomada[j]) continue;
     ordenadas[j] = rs[i];
     usadaI[i] = true;
