@@ -1,0 +1,24 @@
+.git/
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Frontend artefactos locales
+frontend/node_modules/
+frontend/dist/
+
+# Trame POC y spikes que no van al contenedor
+main.py
+spike/
+mockup/
+tests/
+test_galois.py
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp

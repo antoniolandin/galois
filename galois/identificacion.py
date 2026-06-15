@@ -46,8 +46,11 @@ class _GapProcess:
         # GAP con -q -b: sin banner ni prompts. stderr a DEVNULL para
         # silenciar los "#I  packagemanager package is not available"
         # y similares que ensucian el parser.
+        # Lo envolvemos en `stdbuf -oL` para forzar line-buffering en
+        # stdout: sin TTY (caso Docker / subprocess sin pty) GAP bloque-
+        # buffea por defecto y el lector se cuelga esperando respuesta.
         self._proc = subprocess.Popen(
-            ["gap", "-q", "-b"],
+            ["stdbuf", "-oL", "gap", "-q", "-b"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,

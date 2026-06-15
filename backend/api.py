@@ -317,3 +317,20 @@ def stauduhar(req: StauduharRequest) -> StauduharResponse:
             detail=f"No se pudo procesar el polinomio: {exc}",
         ) from exc
     return StauduharResponse(**resultado)
+
+
+# -- Frontend compilado (solo en despliegue) ------------------------
+# En desarrollo el frontend lo sirve vite con proxy /api -> :8000; en
+# Docker (HF Spaces, Fly, etc.) el bundle vive en ./frontend_dist y lo
+# servimos desde el mismo contenedor para evitar CORS y simplificar el
+# despliegue. El mount va al final para no eclipsar las rutas /api.
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
+_frontend_dist = Path(__file__).resolve().parent.parent / "frontend_dist"
+if _frontend_dist.is_dir():
+    app.mount(
+        "/",
+        StaticFiles(directory=_frontend_dist, html=True),
+        name="frontend",
+    )
