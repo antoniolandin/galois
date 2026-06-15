@@ -24,11 +24,6 @@ from dataclasses import asdict, dataclass, field
 
 import sympy as sp
 from sympy.combinatorics import Permutation
-from sympy.combinatorics.named_groups import SymmetricGroup, AlternatingGroup
-from sympy.combinatorics.galois import (
-    S3TransitiveSubgroups, S4TransitiveSubgroups, S5TransitiveSubgroups,
-)
-from sympy.polys.numberfields.galois_resolvents import Resolvent
 
 
 _X = sp.Symbol("x")
@@ -178,8 +173,10 @@ def _valor_complejo_latex(v: complex, tol: float = 1e-8) -> str:
         # Imaginario "limpio"?
         if abs(im - round(im)) < tol:
             iv = int(round(im))
-            if iv == 1: return "i"
-            if iv == -1: return "-i"
+            if iv == 1:
+                return "i"
+            if iv == -1:
+                return "-i"
             return rf"{iv} i"
         return rf"{im:.2f} i"
     # Complejo general — pero suprime la parte imaginaria si redondeada
@@ -646,7 +643,7 @@ def _probar_candidato(
         )
     elif raices_multiples:
         razon = (
-            rf"$Q(t)$ tiene raices enteras pero con multiplicidad $> 1$. "
+            r"$Q(t)$ tiene raices enteras pero con multiplicidad $> 1$. "
             r"El test del Teorema 5 no concluye directamente; haria falta "
             r"una transformacion de Tschirnhausen. Pasamos al siguiente "
             "candidato."
@@ -746,10 +743,10 @@ def _descender(n: int, f_poly: sp.Poly) -> tuple[list[NivelDescenso], str]:
                     descender_a = "C_4"
                     c4_tried.descender_a = "C_4"
                     c4_tried.razon = (
-                        rf"$Q(t)$ tiene raiz entera multiple. Test auxiliar: "
-                        rf"$f(x)$ factoriza en cuadraticas sobre "
-                        rf"$\mathbb{{Q}}(\sqrt{{\Delta_f}})$, luego "
-                        rf"$\mathrm{{Gal}}(f) = C_4$."
+                        r"$Q(t)$ tiene raiz entera multiple. Test auxiliar: "
+                        r"$f(x)$ factoriza en cuadraticas sobre "
+                        r"$\mathbb{Q}(\sqrt{\Delta_f})$, luego "
+                        r"$\mathrm{Gal}(f) = C_4$."
                     )
 
         niveles.append(NivelDescenso(

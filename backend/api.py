@@ -9,9 +9,12 @@ Arrancar en desarrollo:
     uv run uvicorn backend.api:app --reload --port 8000
 """
 
+from pathlib import Path
+
 import numpy as np
 import sympy.combinatorics as comb
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 
 from galois.galois_objetivo import calcular_grupo_galois
 from galois.identificacion import identificar_grupo_via_gap
@@ -324,9 +327,6 @@ def stauduhar(req: StauduharRequest) -> StauduharResponse:
 # Docker (HF Spaces, Fly, etc.) el bundle vive en ./frontend_dist y lo
 # servimos desde el mismo contenedor para evitar CORS y simplificar el
 # despliegue. El mount va al final para no eclipsar las rutas /api.
-from pathlib import Path
-from fastapi.staticfiles import StaticFiles
-
 _frontend_dist = Path(__file__).resolve().parent.parent / "frontend_dist"
 if _frontend_dist.is_dir():
     app.mount(

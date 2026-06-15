@@ -54,11 +54,11 @@ def main() -> None:
 
     alpha_estrella = 0 + 0j
     raices = raices_en(P, alpha_estrella)
-    print(f"\nRaíces en α* = 0:")
+    print("\nRaíces en α* = 0:")
     for k, x in enumerate(raices):
         print(f"  x_{k} = {x.real:+.4f}{x.imag:+.4f}j")
 
-    print(f"\n--- Permutaciones por punto de ramificación ---")
+    print("\n--- Permutaciones por punto de ramificación ---")
     generadores = []
     radio = 0.15
     for b in ramif:
@@ -69,7 +69,7 @@ def main() -> None:
         generadores.append(sigma)
 
     G = subgrupo_generado(generadores, P.grado)
-    print(f"\n--- Subgrupo generado ---")
+    print("\n--- Subgrupo generado ---")
     print(f"Orden:      {G.order()}")
     print(f"Estructura: {describir_grupo(G, P.grado)}")
     print(f"Órbitas:    {[sorted(o) for o in orbitas(G)]}")

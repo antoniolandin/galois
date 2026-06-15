@@ -41,7 +41,7 @@ jobs:
         run: uv sync --frozen
 
       - name: Ruff
-        run: uv run ruff check .
+        run: uvx ruff check .
 
   test:
     name: Tests del backend

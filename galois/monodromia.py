@@ -12,7 +12,6 @@ import numpy as np
 import sympy.combinatorics as comb
 
 from .continuacion import seguir_raiz
-from .identificacion import identificar_grupo_via_gap
 from .polinomio import Polinomio
 from .raices import raices_en
 
