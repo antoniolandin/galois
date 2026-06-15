@@ -17,4 +17,6 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force "https://antoniolandin:${HF_TOKEN}@huggingface.co/spaces/antoniolandin/galois" master
+          # HF Spaces sirve la app desde la rama `main`; pusheamos
+          # `master` local mapeada a `main` remoto.
+          git push --force "https://antoniolandin:${HF_TOKEN}@huggingface.co/spaces/antoniolandin/galois" master:main
