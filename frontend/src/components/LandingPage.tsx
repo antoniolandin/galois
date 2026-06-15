@@ -2,6 +2,8 @@
 // o al de Stauduhar. Sirve como índice del TFG y como punto neutro al
 // abrir la URL raíz.
 
+import { monodromiaDataUrl } from '../assets/monodromia';
+
 interface Props {
   onGoToMonodromia: () => void;
   onGoToStauduhar: () => void;
@@ -23,7 +25,7 @@ export function LandingPage({ onGoToMonodromia, onGoToStauduhar }: Props) {
           >
             <div
               className="landing-card-visual"
-              style={{ backgroundImage: 'url(/landing/monodromia.png)' }}
+              style={{ backgroundImage: `url(${monodromiaDataUrl})` }}
             />
             <div className="landing-card-body">
               <h2>Monodromía</h2>
