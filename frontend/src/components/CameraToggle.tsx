@@ -26,8 +26,8 @@ export function CameraToggle({ mode, povIdx, onChange }: Props) {
       className={`camera-toggle-btn ${isPov ? 'is-pov' : 'is-orbital'}`}
       title={
         isPov
-          ? `Cámara orbital (saliendo de la raíz ${povIdx})`
-          : `Primera persona desde la raíz ${povIdx}`
+          ? `Orbit camera (leaving root ${povIdx})`
+          : `First person from root ${povIdx}`
       }
       style={style}
       onClick={() => onChange(isPov ? 'orbital' : 'pov')}

@@ -16,19 +16,19 @@ export function ViewToggle({ view, onChange }: Props) {
         className={`opt ${view === 'superficie' ? 'active' : ''}`}
         onClick={() => onChange('superficie')}
       >
-        Superficie
+        Surface
       </div>
       <div
         className={`opt ${view === 'trayectorias' ? 'active' : ''}`}
         onClick={() => onChange('trayectorias')}
       >
-        Trayectorias
+        Trajectories
       </div>
       <div
         className={`opt ${view === 'plano-x' ? 'active' : ''}`}
         onClick={() => onChange('plano-x')}
       >
-        Plano x
+        x-plane
       </div>
     </div>
   );

@@ -85,10 +85,10 @@ GRUPO_GALOIS: dict = calcular_grupo_galois(P, ALPHA_ESTRELLA, RAMIFICACION)
 app = FastAPI(
     title="Galois Monodromy API",
     description=(
-        "API JSON del visualizador interactivo del grupo de Galois por "
-        "monodromia. Sirve geometria base (puntos de ramificacion, "
-        "fibra base) y procesa lazos del frontend devolviendo "
-        "permutaciones y trayectorias precomputadas para animacion."
+        "JSON API for the interactive visualiser of the Galois group via "
+        "monodromy. Serves base geometry (branch points, base fiber) and "
+        "processes loops from the frontend, returning precomputed "
+        "permutations and trajectories for animation."
     ),
     version="0.1.0",
 )
@@ -176,34 +176,35 @@ def set_polinomio(req: PolinomioRequest) -> PolinomioInfo:
     try:
         expr = sp.sympify(expr_str, locals={"x": x_sym, "alpha": alpha_sym})
     except (sp.SympifyError, SyntaxError, TypeError):
-        raise HTTPException(status_code=400, detail="Sintaxis invalida en la expresion.")
+        raise HTTPException(status_code=400, detail="Invalid syntax in the expression.")
     libres = expr.free_symbols
     if x_sym not in libres:
-        raise HTTPException(status_code=400, detail="La expresion debe contener la variable x.")
+        raise HTTPException(status_code=400, detail="The expression must contain the variable x.")
     if alpha_sym not in libres:
-        raise HTTPException(status_code=400, detail="La expresion debe contener la variable α.")
+        raise HTTPException(status_code=400, detail="The expression must contain the variable α.")
     extras = libres - {x_sym, alpha_sym}
     if extras:
         nombres = ", ".join(sorted(str(s) for s in extras))
         raise HTTPException(
             status_code=400,
-            detail=f"Solo se permiten las variables x y α; sobran: {nombres}.",
+            detail=f"Only the variables x and α are allowed; extra: {nombres}.",
         )
     try:
         P_nuevo = desde_expresion(expr)
     except Exception as e:
         msg = str(e)
-        # Errores frecuentes de sympy traducidos a castellano. El resto
-        # se reportan literales para que el usuario tenga algo a mano.
+        # Errores frecuentes de sympy traducidos a mensajes claros para
+        # el usuario. El resto se reportan literales para que tenga algo
+        # a mano.
         if "contains an element of the set of generators" in msg:
             detalle = (
-                "La expresion debe ser polinomica en x: solo se permiten "
-                "potencias enteras no negativas (x, x^2, ..., no 1/x ni x^(1/2))."
+                "The expression must be polynomial in x: only non-negative "
+                "integer powers are allowed (x, x^2, ..., not 1/x or x^(1/2))."
             )
         elif "must be a Symbol" in msg or "must be a polynomial" in msg:
-            detalle = "La expresion no es un polinomio en x."
+            detalle = "The expression is not a polynomial in x."
         else:
-            detalle = f"No se reconoce como polinomio en x con coeficientes en C[α] ({msg})."
+            detalle = f"Not recognised as a polynomial in x with coefficients in C[α] ({msg})."
         raise HTTPException(status_code=400, detail=detalle)
     P = P_nuevo
     RAMIFICACION = puntos_de_ramificacion(P)
@@ -237,7 +238,7 @@ def permutacion(req: LazoRequest) -> PermutacionResponse:
     if len(lazo) < 3:
         raise HTTPException(
             status_code=400,
-            detail="El lazo debe contener al menos tres puntos tras el cierre.",
+            detail="The loop must contain at least three points after closing.",
         )
 
     try:
@@ -248,8 +249,8 @@ def permutacion(req: LazoRequest) -> PermutacionResponse:
         raise HTTPException(
             status_code=422,
             detail=(
-                "La continuacion fallo (probablemente el lazo pasa demasiado "
-                f"cerca de un punto de ramificacion): {exc}"
+                "Continuation failed (the loop probably passes too close "
+                f"to a branch point): {exc}"
             ),
         ) from exc
 
@@ -272,8 +273,8 @@ def grupo(req: SubgrupoRequest) -> SubgrupoResponse:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Generador de longitud {len(g)} no compatible con "
-                    f"grado {req.grado}."
+                    f"Generator of length {len(g)} is not compatible with "
+                    f"degree {req.grado}."
                 ),
             )
 
@@ -326,7 +327,7 @@ def stauduhar(req: StauduharRequest) -> StauduharResponse:
     except Exception as exc:
         raise HTTPException(
             status_code=400,
-            detail=f"No se pudo procesar el polinomio: {exc}",
+            detail=f"Could not process the polynomial: {exc}",
         ) from exc
     return StauduharResponse(**resultado)
 

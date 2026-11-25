@@ -23,32 +23,32 @@ class Complejo(BaseModel):
 class PolinomioInfo(BaseModel):
     """Snapshot del polinomio actual y de su geometria asociada."""
 
-    expresion: str = Field(..., description="Expresion simbolica de P(x, alpha)")
-    grado: int = Field(..., description="Grado de P en x")
-    alpha_estrella: Complejo = Field(..., description="Punto base de los lazos")
+    expresion: str = Field(..., description="Symbolic expression of P(x, alpha)")
+    grado: int = Field(..., description="Degree of P in x")
+    alpha_estrella: Complejo = Field(..., description="Base point of the loops")
     puntos_de_ramificacion: list[Complejo] = Field(
-        ..., description="Ceros del discriminante respecto a x"
+        ..., description="Zeros of the discriminant with respect to x"
     )
     raices_base: list[Complejo] = Field(
-        ..., description="Raices de P(x, alpha_estrella), en el orden de np.roots"
+        ..., description="Roots of P(x, alpha_estrella), in np.roots order"
     )
     branch_x: list[Complejo] = Field(
         default_factory=list,
         description=(
-            "Raices dobles de P en x: para cada α_b en la "
-            "ramificacion, los ceros simultaneos de P(x, α_b) = 0 y "
-            "∂P/∂x(x, α_b) = 0. Sirven al frontend para pintarlos "
-            "en el plano x como marcadores 'fantasma'."
+            "Double roots of P in x: for each α_b in the branch points, "
+            "the simultaneous zeros of P(x, α_b) = 0 and "
+            "∂P/∂x(x, α_b) = 0. Used by the frontend to draw them "
+            "on the x-plane as 'ghost' markers."
         ),
     )
     coefs_alpha: list[list[Complejo]] = Field(
         ...,
         description=(
-            "Coeficientes del polinomio en x con cada coeficiente "
-            "expandido como polinomio en alpha. coefs_alpha[k] es la "
-            "lista de coeficientes de a_k(alpha), en orden de grado "
-            "decreciente en alpha. coefs_alpha[0] = a_n (lider, "
-            "normalmente [{1, 0}] por monicidad)."
+            "Coefficients of the polynomial in x, with each coefficient "
+            "expanded as a polynomial in alpha. coefs_alpha[k] is the "
+            "list of coefficients of a_k(alpha), in decreasing degree "
+            "order in alpha. coefs_alpha[0] = a_n (leading, "
+            "normally [{1, 0}] since the polynomial is monic)."
         ),
     )
 
@@ -60,8 +60,8 @@ class LazoRequest(BaseModel):
     cerrar_en_alpha_estrella: bool = Field(
         True,
         description=(
-            "Si True, antepone y pospone alpha_estrella al lazo para "
-            "garantizar que esta basado en el punto base."
+            "If True, prepends and appends alpha_estrella to the loop to "
+            "guarantee that it is based at the base point."
         ),
     )
 
@@ -73,18 +73,18 @@ class PermutacionResponse(BaseModel):
     asignacion: list[int] = Field(
         ...,
         description=(
-            "Permutacion en formato one-line: asignacion[i] = j "
-            "significa que la raiz inicial i acaba en la posicion j."
+            "Permutation in one-line format: asignacion[i] = j "
+            "means that initial root i ends up at position j."
         ),
     )
     cycles: list[list[int]] = Field(
-        ..., description="Permutacion en forma ciclica disjunta"
+        ..., description="Permutation in disjoint cycle form"
     )
     trayectorias: list[list[Complejo]] = Field(
         ...,
         description=(
-            "Posiciones de las n raices en cada paso del lazo. "
-            "Shape: [n_raices][n_pasos]."
+            "Positions of the n roots at each step of the loop. "
+            "Shape: [n_roots][n_steps]."
         ),
     )
 

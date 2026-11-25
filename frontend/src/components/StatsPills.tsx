@@ -30,7 +30,7 @@ export function formatEstructura(s: string): string {
 }
 
 const formatBool = (b: boolean | null | undefined): string =>
-  b === true ? 'sí' : b === false ? 'no' : '—';
+  b === true ? 'yes' : b === false ? 'no' : '—';
 
 function formatCenter(orden: number | null | undefined): string {
   if (orden == null) return '—';
@@ -66,11 +66,11 @@ export function StatsPills({ subgrupo, completo }: Props) {
         onMouseLeave={() => setShowInfo(false)}
         title={
           completo
-            ? 'El subgrupo coincide con el grupo de Galois objetivo'
+            ? 'The subgroup matches the target Galois group'
             : undefined
         }
       >
-        <span className="lbl">Estructura</span>
+        <span className="lbl">Structure</span>
         <span className="val">
           {subgrupo ? formatEstructura(subgrupo.estructura) : '—'}
         </span>
@@ -85,43 +85,43 @@ export function StatsPills({ subgrupo, completo }: Props) {
                   </dd>
                 </>
               )}
-              <dt>Abeliano</dt>
+              <dt>Abelian</dt>
               <dd>{formatBool(subgrupo.is_abelian)}</dd>
-              <dt>Resoluble</dt>
+              <dt>Solvable</dt>
               <dd>{formatBool(subgrupo.is_solvable)}</dd>
-              <dt>Nilpotente</dt>
+              <dt>Nilpotent</dt>
               <dd>{formatBool(subgrupo.is_nilpotent)}</dd>
               <dt>Simple</dt>
               <dd>{formatBool(subgrupo.is_simple)}</dd>
-              <dt>Perfecto</dt>
+              <dt>Perfect</dt>
               <dd>{formatBool(subgrupo.is_perfect)}</dd>
-              <dt>Transitivo</dt>
+              <dt>Transitive</dt>
               <dd>{formatBool(subgrupo.is_transitive)}</dd>
               {subgrupo.is_primitive != null && (
                 <>
-                  <dt>Primitivo</dt>
+                  <dt>Primitive</dt>
                   <dd>{formatBool(subgrupo.is_primitive)}</dd>
                 </>
               )}
-              <dt>Centro</dt>
+              <dt>Center</dt>
               <dd>{formatCenter(subgrupo.center_order)}</dd>
               {subgrupo.composition_factors &&
                 subgrupo.composition_factors.length > 0 && (
                   <>
-                    <dt>Factores</dt>
+                    <dt>Factors</dt>
                     <dd>
                       {formatFactoresComposicion(subgrupo.composition_factors)}
                     </dd>
                   </>
                 )}
-              <dt>Órbitas</dt>
+              <dt>Orbits</dt>
               <dd>{formatOrbitas(subgrupo.orbitas)}</dd>
             </dl>
           </div>
         )}
       </div>
       <div className="pill">
-        <span className="lbl">Orden</span>
+        <span className="lbl">Order</span>
         <span className="val num">{subgrupo?.orden ?? 1}</span>
       </div>
     </div>

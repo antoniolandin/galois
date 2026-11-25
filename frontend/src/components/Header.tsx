@@ -78,10 +78,10 @@ function validar(
     .replace(/\ba\b/g, 'alpha')
     .replace(/\^/g, '**')
     .trim();
-  if (norm.length === 0) return { ok: false, error: 'Expresión vacía' };
-  if (!/\bx\b/.test(norm)) return { ok: false, error: 'Falta la variable x' };
+  if (norm.length === 0) return { ok: false, error: 'Empty expression' };
+  if (!/\bx\b/.test(norm)) return { ok: false, error: 'Missing variable x' };
   if (!/\balpha\b/.test(norm))
-    return { ok: false, error: 'Falta la variable α' };
+    return { ok: false, error: 'Missing variable α' };
   return { ok: true, expr: norm };
 }
 
@@ -124,7 +124,7 @@ export function Header({ expresion, onChangeExpresion, onGoHome }: Props) {
       await onChangeExpresion(r.expr);
       setEditing(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error desconocido');
+      setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setEnviando(false);
     }
@@ -136,8 +136,8 @@ export function Header({ expresion, onChangeExpresion, onGoHome }: Props) {
         <button
           className="btn-back btn-home"
           onClick={onGoHome}
-          title="Volver a la página de inicio"
-          aria-label="Inicio"
+          title="Back to home page"
+          aria-label="Home"
         >
           <svg
             width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -149,7 +149,7 @@ export function Header({ expresion, onChangeExpresion, onGoHome }: Props) {
           </svg>
         </button>
       )}
-      <h1>Visualizador de monodromía</h1>
+      <h1>Monodromy Visualiser</h1>
       {editing ? (
         <div className="poly-edit">
           <input
@@ -183,7 +183,7 @@ export function Header({ expresion, onChangeExpresion, onGoHome }: Props) {
         <span
           className={'poly' + (onChangeExpresion ? ' poly-editable' : '')}
           title={
-            onChangeExpresion ? 'Click para cambiar el polinomio' : undefined
+            onChangeExpresion ? 'Click to change the polynomial' : undefined
           }
           onClick={startEdit}
         >

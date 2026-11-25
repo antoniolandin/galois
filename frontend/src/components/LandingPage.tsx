@@ -14,7 +14,7 @@ export function LandingPage({ onGoToMonodromia, onGoToStauduhar }: Props) {
     <div className="landing">
       <div className="landing-inner">
         <header className="landing-head">
-          <h1>Visualizador del grupo de Galois</h1>
+          <h1>Galois Group Visualiser</h1>
         </header>
 
         <div className="landing-cards">
@@ -28,11 +28,11 @@ export function LandingPage({ onGoToMonodromia, onGoToStauduhar }: Props) {
               style={{ backgroundImage: `url(${monodromiaDataUrl})` }}
             />
             <div className="landing-card-body">
-              <h2>Monodromía</h2>
+              <h2>Monodromy</h2>
               <p>
-                Familia <code>P(x, α)</code> sobre{' '}
-                <span className="ital">C</span>(α): lazos en el plano del
-                parámetro.
+                Family <code>P(x, α)</code> over{' '}
+                <span className="ital">C</span>(α): loops in the parameter
+                plane.
               </p>
             </div>
           </button>
@@ -49,15 +49,16 @@ export function LandingPage({ onGoToMonodromia, onGoToStauduhar }: Props) {
             <div className="landing-card-body">
               <h2>Stauduhar</h2>
               <p>
-                Polinomio <code>f(x) ∈ Q[x]</code>: descenso por subgrupos
-                transitivos maximales.
+                Polynomial <code>f(x) ∈ Q[x]</code>: descent through maximal
+                transitive subgroups.
               </p>
             </div>
           </button>
         </div>
 
         <footer className="landing-foot">
-          TFG · Cálculo y visualización del grupo de Galois mediante monodromía
+          Bachelor's thesis · Computation and visualisation of the Galois
+          group via monodromy
         </footer>
       </div>
     </div>

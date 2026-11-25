@@ -18,7 +18,7 @@ export function ModeSelector({ mode, onChange }: Props) {
         className={`mode ${mode === 'aleatorio' ? 'active' : ''}`}
         onClick={() => onChange('aleatorio')}
       >
-        Aleatorio
+        Random
       </button>
       <button
         className={`mode ${mode === 'hauenstein' ? 'active' : ''}`}

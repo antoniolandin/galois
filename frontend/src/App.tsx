@@ -36,15 +36,22 @@ type PageView = 'landing' | 'monodromia' | 'stauduhar';
 function pageDeUrl(): PageView {
   const p = window.location.pathname;
   if (p.startsWith('/stauduhar')) return 'stauduhar';
-  if (p.startsWith('/monodromia')) return 'monodromia';
-  return 'landing';
+  if (p.startsWith('/home')) return 'landing';
+  // La raíz abre directamente el visor de monodromía: es lo primero
+  // que debe ver quien llega desde un enlace (p. ej. un reclutador).
+  return 'monodromia';
 }
 
 function pathDePage(v: PageView): string {
   if (v === 'stauduhar') return '/stauduhar';
-  if (v === 'monodromia') return '/monodromia';
+  if (v === 'landing') return '/home';
   return '/';
 }
+
+// Demo al abrir la raíz: vista 3D de la superficie de Riemann y el
+// algoritmo automático arrancado en cuanto llega el polinomio.
+const DEMO_VIEW: View = 'superficie';
+const DEMO_MODE: Mode = 'hauenstein';
 
 // Un generador guardado lleva consigo todo el contexto visual que se
 // usó para descubrirlo: el trazo del plano α, las trayectorias de
@@ -94,7 +101,7 @@ export default function App() {
     null,
   );
   const [mode, setMode] = useState<Mode>('manual');
-  const [view, setView] = useState<View>('plano-x');
+  const [view, setView] = useState<View>(DEMO_VIEW);
   const [cameraMode, setCameraMode] = useState<CameraMode>('orbital');
   // Cámara orbital compartida entre las dos vistas 3D (Superficie
   // de Riemann y Trayectorias). Levantarla a App hace que al
@@ -831,6 +838,15 @@ export default function App() {
     handleResetVisual,
   ]);
 
+  // Al abrir el visor, arrancar una sola vez el algoritmo automático de
+  // la demo en cuanto el backend ha devuelto el polinomio.
+  const demoArrancadaRef = useRef(false);
+  useEffect(() => {
+    if (demoArrancadaRef.current || !polinomio || pageView !== 'monodromia') return;
+    demoArrancadaRef.current = true;
+    setMode(DEMO_MODE);
+  }, [polinomio, pageView]);
+
   // Atajos de teclado. Sólo activos en modo Manual: en Aleatorio y
   // Hauenstein el plano α lo pilota un bucle automático y un
   // Ctrl+Z o un Escape lo dejarían incoherente con el state del
@@ -873,7 +889,7 @@ export default function App() {
       <div className="app">
         <Header onGoHome={() => setPageView('landing')} />
         <div style={{ padding: 20, color: '#666' }}>
-          Esperando al backend en <code>http://localhost:8000</code>…
+          Waiting for the backend at <code>http://localhost:8000</code>…
         </div>
       </div>
     );
@@ -921,7 +937,7 @@ export default function App() {
         <div className="loading-overlay" role="status" aria-live="polite">
           <div className="loading-card">
             <div className="loading-spinner" aria-hidden />
-            <div className="loading-text">Recalculando polinomio…</div>
+            <div className="loading-text">Recalculating polynomial…</div>
           </div>
         </div>
       )}
@@ -933,11 +949,11 @@ export default function App() {
       <div className="main" key={polinomioKey}>
         {/* --- Columna 1: plano α --- */}
         <div className="panel col-alpha">
-          <div className="panel-label">Modo</div>
+          <div className="panel-label">Mode</div>
           <ModeSelector mode={mode} onChange={setMode} />
 
           <div className="panel-label">
-            Plano de <span className="var">α</span>
+            <span className="var">α</span>-plane
           </div>
           <PlanoAlpha
             key={resetKey}
@@ -973,8 +989,8 @@ export default function App() {
                   disabled={!runningAleatorio && grupoCompleto}
                 >
                   {runningAleatorio
-                    ? `Detener (iter ${iterAleatorio})`
-                    : 'Continuar'}
+                    ? `Stop (iter ${iterAleatorio})`
+                    : 'Continue'}
                 </button>
                 <button
                   className="btn"
@@ -996,10 +1012,10 @@ export default function App() {
                   disabled={!runningHauenstein && grupoCompleto}
                 >
                   {runningHauenstein
-                    ? `Detener (B ${iterHauenstein}/${
+                    ? `Stop (B ${iterHauenstein}/${
                         polinomio.puntos_de_ramificacion.length
                       })`
-                    : 'Continuar'}
+                    : 'Continue'}
                 </button>
                 <button
                   className="btn"
@@ -1016,7 +1032,7 @@ export default function App() {
                   onClick={handleDeshacer}
                   disabled={generadores.length === 0}
                 >
-                  Deshacer
+                  Undo
                 </button>
                 <button
                   className="btn"

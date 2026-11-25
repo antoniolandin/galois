@@ -36,17 +36,17 @@ export function PanelGrupo({
   return (
     <>
       <div className="field">
-        <div className="field-label">Generadores</div>
+        <div className="field-label">Generators</div>
         <div className="gens">
           {empty ? (
-            <div className="gens-empty">ninguno aún</div>
+            <div className="gens-empty">none yet</div>
           ) : (
             generadores.map((g, i) => (
               <div
                 className={'gen' + (selectedIdx === i ? ' selected' : '')}
                 key={i}
                 onClick={() => onSelect(i)}
-                title="Click para ver el lazo que generó esta permutación"
+                title="Click to see the loop that generated this permutation"
               >
                 <span className="index">σ{subindex(i + 1)}</span>
                 <span className="perm">{formatPerm(g.permutacion)}</span>
@@ -56,8 +56,8 @@ export function PanelGrupo({
                     e.stopPropagation();
                     onDelete(i);
                   }}
-                  title="Eliminar este generador"
-                  aria-label="Eliminar"
+                  title="Delete this generator"
+                  aria-label="Delete"
                 >
                   ×
                 </button>
@@ -69,7 +69,7 @@ export function PanelGrupo({
 
       {subgrupo?.lattice && (
         <div className="field lattice-field">
-          <div className="field-label">Retículo de subgrupos</div>
+          <div className="field-label">Subgroup lattice</div>
           <LatticeView lattice={subgrupo.lattice} />
         </div>
       )}

@@ -768,13 +768,13 @@ def descenso_stauduhar(coefs: list, grado: int) -> dict:
     """Punto de entrada principal."""
     f = sp.Poly([sp.Rational(c) for c in coefs], _X)
     if f.degree() != grado:
-        raise ValueError(f"El polinomio tiene grado {f.degree()}, no {grado}.")
+        raise ValueError(f"The polynomial has degree {f.degree()}, not {grado}.")
     if f.LC() != 1:
-        raise ValueError("El polinomio debe ser monico.")
+        raise ValueError("The polynomial must be monic.")
     if not f.is_irreducible:
-        raise ValueError("Stauduhar requiere un polinomio irreducible sobre Q.")
+        raise ValueError("Stauduhar requires a polynomial irreducible over Q.")
     if grado not in (3, 4, 5):
-        raise ValueError(f"Grado {grado} no soportado (solo 3, 4, 5).")
+        raise ValueError(f"Degree {grado} is not supported (only 3, 4, 5).")
 
     niveles, grupo_final = _descender(grado, f)
 
@@ -792,7 +792,7 @@ def desde_expresion(expr_str: str, grado: int) -> dict:
     expr = sp.sympify(expr_str.replace("^", "**"), locals={"x": _X})
     f = sp.Poly(expr, _X)
     if f.degree() != grado:
-        raise ValueError(f"La expresion tiene grado {f.degree()}, no {grado}.")
+        raise ValueError(f"The expression has degree {f.degree()}, not {grado}.")
     if f.LC() != 1:
         f = sp.Poly(f.as_expr() / f.LC(), _X)
     return descenso_stauduhar(f.all_coeffs(), grado)

@@ -438,14 +438,14 @@ function PillGrupo(props: {
   const { label, nombre, orden, grado, info, completo } = props;
   const [showInfo, setShowInfo] = useState(false);
   const bool = (b: boolean | null | undefined): string =>
-    b === true ? 'sí' : b === false ? 'no' : '—';
+    b === true ? 'yes' : b === false ? 'no' : '—';
   const centro = (n: number | null | undefined): string =>
     n == null ? '—' : n === 1 ? 'trivial' : String(n);
   return (
     <span
       className={
         'pill pill-grupo' +
-        (label === 'Nivel' ? ' pill-nivel' : '') +
+        (label === 'Level' ? ' pill-nivel' : '') +
         (completo ? ' completo' : '')
       }
       onMouseEnter={() => setShowInfo(true)}
@@ -462,31 +462,31 @@ function PillGrupo(props: {
                 <dd>{grado}T{info.tid}</dd>
               </>
             )}
-            <dt>Orden</dt>
+            <dt>Order</dt>
             <dd>{orden}</dd>
-            <dt>Abeliano</dt>
+            <dt>Abelian</dt>
             <dd>{bool(info.is_abelian)}</dd>
-            <dt>Resoluble</dt>
+            <dt>Solvable</dt>
             <dd>{bool(info.is_solvable)}</dd>
-            <dt>Nilpotente</dt>
+            <dt>Nilpotent</dt>
             <dd>{bool(info.is_nilpotent)}</dd>
             <dt>Simple</dt>
             <dd>{bool(info.is_simple)}</dd>
-            <dt>Perfecto</dt>
+            <dt>Perfect</dt>
             <dd>{bool(info.is_perfect)}</dd>
-            <dt>Transitivo</dt>
+            <dt>Transitive</dt>
             <dd>{bool(info.is_transitive)}</dd>
             {info.is_primitive != null && (
               <>
-                <dt>Primitivo</dt>
+                <dt>Primitive</dt>
                 <dd>{bool(info.is_primitive)}</dd>
               </>
             )}
-            <dt>Centro</dt>
+            <dt>Center</dt>
             <dd>{centro(info.center_order)}</dd>
             {info.composition_factors && info.composition_factors.length > 0 && (
               <>
-                <dt>Factores</dt>
+                <dt>Factors</dt>
                 <dd>{formatFactoresComposicion(info.composition_factors)}</dd>
               </>
             )}
@@ -549,7 +549,7 @@ export function StauduharPage({ onBack }: Props) {
         setHistorial([]);
         setAnimDiff(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error desconocido');
+        setError(err instanceof Error ? err.message : 'Unknown error');
         setData(null);
       } finally {
         setLoading(false);
@@ -824,8 +824,8 @@ export function StauduharPage({ onBack }: Props) {
         <button
           className="btn-back btn-home"
           onClick={onBack}
-          title="Volver a la página de inicio"
-          aria-label="Inicio"
+          title="Back to home page"
+          aria-label="Home"
         >
           <svg
             width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -836,7 +836,7 @@ export function StauduharPage({ onBack }: Props) {
             <path d="M5 10v10h14V10" />
           </svg>
         </button>
-        <h1>Visualizador del descenso de Stauduhar</h1>
+        <h1>Stauduhar Descent Visualiser</h1>
         {editing ? (
           <div className="poly-edit">
             <span>f(x) =</span>
@@ -856,7 +856,7 @@ export function StauduharPage({ onBack }: Props) {
         ) : (
           <span
             className="poly poly-editable"
-            title="Click para cambiar el polinomio"
+            title="Click to change the polynomial"
             onClick={() => {
               setDraft(polinomio);
               setEditing(true);
@@ -875,12 +875,12 @@ export function StauduharPage({ onBack }: Props) {
           {nivelActual && (
             <>
               <div className="field-label">
-                Maximales transitivos en{' '}
+                Maximal transitive subgroups in{' '}
                 {renderGroupName(nivelActual.grupo_actual_latex)}
               </div>
               <div className="maximales">
                 {maximalesNivel.length === 0 && (
-                  <div className="max-empty">— sin maximales transitivos —</div>
+                  <div className="max-empty">— no maximal transitive subgroups —</div>
                 )}
                 {maximalesNivel.map((m) => {
                   // Completados (resolvente entera construida) no se
@@ -901,7 +901,7 @@ export function StauduharPage({ onBack }: Props) {
                       onClick={() => {
                         if (clicable) irACandidato(m.idxEnNivel);
                       }}
-                      title={clicable ? 'Click para volver a este candidato' : undefined}
+                      title={clicable ? 'Click to go back to this candidate' : undefined}
                     >
                       <div className="head">
                         <span className="name">
@@ -923,12 +923,12 @@ export function StauduharPage({ onBack }: Props) {
           {loading && (
             <div className="stauduhar-loading">
               <div className="loading-spinner" />
-              <p>Calculando descenso de Stauduhar…</p>
+              <p>Computing Stauduhar descent…</p>
             </div>
           )}
           {!data && !error && !loading && (
             <div className="stauduhar-vacio">
-              <p>Selecciona un polinomio canónico o introduce uno propio.</p>
+              <p>Select a canonical polynomial or enter your own.</p>
               <div className="stauduhar-vacio-sugerencias">
                 {SUGERENCIAS.map((s) => (
                   <button
@@ -980,7 +980,7 @@ export function StauduharPage({ onBack }: Props) {
                 })()}
                 <div className="stat-pills">
                   <PillGrupo
-                    label="Nivel"
+                    label="Level"
                     nombre={nivelPillNombre}
                     orden={nivelPillOrden}
                     grado={data!.grado}
@@ -988,7 +988,7 @@ export function StauduharPage({ onBack }: Props) {
                     completo={!!grupoFinalAlcanzado}
                   />
                   <PillGrupo
-                    label="Candidato"
+                    label="Candidate"
                     nombre={candActual.subgrupo_latex}
                     orden={candActual.subgrupo_orden}
                     grado={data!.grado}
@@ -1093,8 +1093,8 @@ export function StauduharPage({ onBack }: Props) {
                         </div>
                       </div>
                       <div className="ayuda-inicial">
-                        Arrastra los representantes π<sub>i</sub> del panel derecho
-                        sobre el invariante F para construir la resolvente Q(t).
+                        Drag the representatives π<sub>i</sub> from the right-hand
+                        panel onto the invariant F to build the resolvent Q(t).
                       </div>
                     </>
                   );
@@ -1181,33 +1181,33 @@ export function StauduharPage({ onBack }: Props) {
                         return (
                           <div className="exito-banner">
                             <p>
-                              <strong>✓ Resolvente construida.</strong>{' '}
-                              <Tex tex={`Q(t)`} /> tiene la raíz racional simple{' '}
-                              <Tex tex={preColoreLatex(valor)} />, aportada por{' '}
+                              <strong>✓ Resolvent built.</strong>{' '}
+                              <Tex tex={`Q(t)`} /> has the simple rational root{' '}
+                              <Tex tex={preColoreLatex(valor)} />, contributed by{' '}
                               <Tex tex={`\\pi_{${(cidx ?? 0) + 1}} = ${cosetRepr}`} />.
-                              Luego{' '}
+                              Hence{' '}
                               <Tex tex={`\\mathrm{Gal}(f) \\subseteq ${texGrupo(candActual.descender_a)}`} />.
                             </p>
                             {descensoTerminado ? (
                               <p style={{ marginTop: 8 }}>
-                                El catálogo no incluye resolventes para
-                                descender desde{' '}
-                                <Tex tex={texGrupo(candActual.descender_a!)} />, así
-                                que el descenso no puede continuar.
-                                El grupo de Galois podría ser{' '}
-                                <Tex tex={texGrupo(candActual.descender_a!)} /> o
-                                cualquier subgrupo transitivo contenido en él.
+                                The catalogue does not include resolvents to
+                                descend from{' '}
+                                <Tex tex={texGrupo(candActual.descender_a!)} />, so
+                                the descent cannot continue.
+                                The Galois group could be{' '}
+                                <Tex tex={texGrupo(candActual.descender_a!)} /> or
+                                any transitive subgroup contained in it.
                               </p>
                             ) : !esUltimoNivel ? (
                               <button
                                 className="btn"
                                 onClick={() => irANivel(pos.nivelIdx + 1)}
                               >
-                                Pasar al siguiente nivel →
+                                Go to next level →
                               </button>
                             ) : (
                               <p style={{ marginTop: 8 }}>
-                                Es el último nivel del descenso.
+                                This is the last level of the descent.
                               </p>
                             )}
                           </div>
@@ -1221,21 +1221,21 @@ export function StauduharPage({ onBack }: Props) {
                         <div className="fracaso-banner">
                           {!tieneEnterasMult ? (
                             <p>
-                              <strong>✗ Resolvente sin raíces enteras.</strong>{' '}
-                              <Tex tex="Q(t)" /> no tiene ninguna raíz en{' '}
-                              <Tex tex="\mathbb{Z}" />, luego{' '}
+                              <strong>✗ Resolvent has no integer roots.</strong>{' '}
+                              <Tex tex="Q(t)" /> has no root in{' '}
+                              <Tex tex="\mathbb{Z}" />, hence{' '}
                               <Tex tex={`\\mathrm{Gal}(f) \\not\\subseteq ${texGrupo(candActual.subgrupo_latex)}`} />.
-                              Descartamos el candidato.
+                              We discard the candidate.
                             </p>
                           ) : (
                             <p>
-                              <strong>⚠ Raíces enteras con multiplicidad &gt; 1.</strong>{' '}
-                              <Tex tex="Q(t)" /> tiene las raíces enteras{' '}
+                              <strong>⚠ Integer roots with multiplicity &gt; 1.</strong>{' '}
+                              <Tex tex="Q(t)" /> has the integer roots{' '}
                               <Tex tex={candActual.raices_enteras_simples.join(', ')} />,
-                              pero todas son repetidas. El Teorema&nbsp;5 no aplica
-                              directamente; en el algoritmo original se aplicaría una
-                              transformación de Tschirnhausen sobre{' '}
-                              <Tex tex="f(x)" />. Descartamos el candidato.
+                              but they are all repeated. Theorem&nbsp;5 does not
+                              apply directly; the original algorithm would apply a
+                              Tschirnhausen transformation on{' '}
+                              <Tex tex="f(x)" />. We discard the candidate.
                             </p>
                           )}
                           {hayMasCandidatos ? (
@@ -1243,11 +1243,11 @@ export function StauduharPage({ onBack }: Props) {
                               className="btn"
                               onClick={() => irACandidato(pos.candIdx + 1)}
                             >
-                              Probar siguiente candidato →
+                              Try next candidate →
                             </button>
                           ) : (
                             <p style={{ marginTop: 8 }}>
-                              No quedan más candidatos en este nivel.{' '}
+                              No more candidates remain at this level.{' '}
                               <Tex tex={`\\mathrm{Gal}(f) = ${texGrupo(nivelActual.grupo_actual_latex)}`} />.
                             </p>
                           )}
@@ -1262,15 +1262,15 @@ export function StauduharPage({ onBack }: Props) {
               {/* Controles inferiores: solo deshacer y reset. */}
               <div className="controles">
                 <div className="step-counter">
-                  Aplicados <strong>{appliedSteps.size}</strong> / {totalSteps}
+                  Applied <strong>{appliedSteps.size}</strong> / {totalSteps}
                 </div>
                 <button
                   className="btn"
                   onClick={deshacer}
                   disabled={historial.length === 0}
-                  title="Deshacer (Ctrl+Z)"
+                  title="Undo (Ctrl+Z)"
                 >
-                  ↶ Deshacer
+                  ↶ Undo
                 </button>
                 <button
                   className="btn"
@@ -1282,9 +1282,9 @@ export function StauduharPage({ onBack }: Props) {
                     setHasUserAction(false);
                   }}
                   disabled={appliedSteps.size === 0}
-                  title="Reiniciar todo"
+                  title="Reset all"
                 >
-                  ↻ Reiniciar
+                  ↻ Reset
                 </button>
               </div>
             </>
@@ -1295,7 +1295,7 @@ export function StauduharPage({ onBack }: Props) {
         <aside className="panel col-group">
           {candActual && (
             <div className="field">
-              <div className="field-label">Invariante actual</div>
+              <div className="field-label">Current invariant</div>
               {(() => {
                 const tex = candActual.invariante_y_latex;
                 const tooLong = tex.length > 60;
@@ -1357,9 +1357,9 @@ export function StauduharPage({ onBack }: Props) {
             }
             return (
             <div className="field">
-              <div className="field-label">Clases laterales derechas</div>
+              <div className="field-label">Right cosets</div>
               <div className="field-value mono">
-                {aplicadasCnt} de {candActual.cosets.length} aplicadas
+                {aplicadasCnt} of {candActual.cosets.length} applied
               </div>
               <div className="cosets" style={{ marginTop: 8 }}>
                 {candActual.cosets.map((c, idx) => {
@@ -1381,13 +1381,13 @@ export function StauduharPage({ onBack }: Props) {
                         e.dataTransfer.setData('text/plain', String(idx));
                         e.dataTransfer.effectAllowed = 'move';
                       }}
-                      title={arrastrable ? 'Arrástrame al centro' : ''}
+                      title={arrastrable ? 'Drag me to the center' : ''}
                     >
                       <span className="idx">π<sub>{idx + 1}</sub></span>
                       <span className="repr">
                         {renderCoset(c.representante_latex)}
                       </span>
-                      <span className="tag">{aplicada ? 'aplicada' : '—'}</span>
+                      <span className="tag">{aplicada ? 'applied' : '—'}</span>
                     </div>
                   );
                 })}
@@ -1397,7 +1397,7 @@ export function StauduharPage({ onBack }: Props) {
           })()}
 
           <div className="field" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div className="field-label">Retículo</div>
+            <div className="field-label">Lattice</div>
             <div className="lattice-view">
               <Reticulo
                 grado={grado}
